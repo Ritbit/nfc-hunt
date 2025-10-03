@@ -1,0 +1,29 @@
+nfc-001:
+  next_tag: nfc-002
+  clue: "There’s a magic mirror on this floor. If you push its button, you’ll immortalize this moment. You may also find a target near its place. Good luck!\n\n
+  Er is een magische spiegel op deze verdieping. Als je op de knop drukt, kun je dit moment vereeuwigen. Je kunt er dichtbij ook een target vinden. Succes!"
+  final: false
+
+nfc-002:
+  next_tag: nfc-003
+  clue: "The clown fish likes to watch the A’DAM tower across the river. Find it, it is guarding your next target.\n\n
+  De clown vis kijkt graag uit over het water naar de A’DAM toren. Vind deze vis, hij bewaakt je volgende target."
+  final: false
+
+nfc-003:
+  next_tag: nfc-004
+  clue: "What does the fish say? Try if they understand fish-speak at the fruit stand on this floor (or just tell them your favorite fish!), and they will give you your next target.\n\n
+  Wat zegt een vis? Probeer of ze vissentaal spreken bij de fruit kraam op deze verdieping (of vertel ze wat je lievelingsvis is!), en je krijgt je volgende target."
+  final: false
+
+nfc-004:
+  next_tag: nfc-005
+  clue: "Under the stairs the fish are swimming in a kiddie pool. Find a fish that won’t phish you, and scan its message!\n\n
+  Onder de trap zwemmen visjes in een badje. Vind een vis die je niet phisht, en scan zijn boodschap."
+  final: false
+
+nfc-005:
+  next_tag: null
+  clue: "Dive one floor down into the pool full of balls, and find the fish that has your target.\n\n
+  Duik een verdieping naar beneden in het bad vol ballen, en vind de vis die je volgende target heeft."
+  final: true

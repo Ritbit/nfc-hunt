@@ -1,0 +1,18 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- A circular blue background, which looks great as an app icon -->
+  <circle cx="50" cy="50" r="50" fill="#1c4587" />
+
+  <!-- Fish Body -->
+  <path d="M 20,50 C 20,25 60,25 80,50 C 60,75 20,75 20,50 Z" fill="#ff9900" stroke="#c66900" stroke-width="2"/>
+
+  <!-- Fish Tail -->
+  <path d="M 80,50 C 95,35 95,65 80,50 Z" fill="#ff9900" stroke="#c66900" stroke-width="2"/>
+
+  <!-- White Stripes on the body -->
+  <path d="M 45,35 C 40,50 40,50 45,65" fill="none" stroke="white" stroke-width="5"/>
+  <path d="M 58,32 C 53,50 53,50 58,68" fill="none" stroke="white" stroke-width="5"/>
+
+  <!-- Eye -->
+  <circle cx="35" cy="45" r="5" fill="white"/>
+  <circle cx="35" cy="45" r="2.5" fill="black"/>
+</svg>

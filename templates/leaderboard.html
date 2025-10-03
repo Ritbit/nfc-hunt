@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Ocean Adventure - Leaderboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
+</head>
+<style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+    .container { max-width: 700px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #38761d; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { padding: 12px; border-bottom: 1px solid #ddd; }
+    th { background-color: #1c4587; color: white; text-align: left;}
+    tr:nth-child(even) { background-color: #f2f2f2; }
+    tr:hover { background-color: #ddd; }
+    .rank { font-weight: bold; width: 50px; }
+    .player-name { text-align: left; }
+    .time { font-weight: bold; color: #cc0000; }
+    a { color: #1c4587; text-decoration: none; display: inline-block; margin-top: 20px;}
+    a:hover { text-decoration: underline; }
+</style>
+<body>
+<div class="container">
+    <h1>🏆 Top 10 Players 🏆</h1>
+    <table>
+        <tr><th>Rank</th><th class="player-name">Player</th><th>Time</th></tr>
+        {% for player in leaderboard %}
+        <tr><td class="rank">#{{ loop.index }}</td><td class="player-name">{{ player.name }}</td><td class="time">{{ player.time }}</td></tr>
+        {% else %}
+        <tr><td colspan="3">No players have completed the hunt yet!</td></tr>
+        {% endfor %}
+    </table>
+    <a href="{{ url_for('index') }}">Back to Start</a>
+</div>
+</body>
+</html>

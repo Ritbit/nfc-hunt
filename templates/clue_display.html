@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Ocean Adventure - Clue Found!</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
+</head>
+<style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #38761d; }
+    h2 { color: #1c4587; }
+    .clue-text { font-size: 1.5em; margin: 20px 0; padding: 10px; border: 1px dashed #ccc; background-color: #e6ffe6; }
+    .scan-button { background-color: #1c4587; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2em; margin-top: 20px; display: none; /* Hidden by default */ }
+    .scan-button:hover { background-color: #153566; }
+    .scan-status { margin-top: 15px; color: #555; font-style: italic; }
+    .score-time { font-size: 2em; color: #cc0000; font-weight: bold; }
+    .rank-display { font-size: 1.2em; margin-top: 10px; }
+</style>
+<body>
+<div class="container">
+    <h1>{% if final %}🎉 Hunt Complete! 🎉{% else %}Clue Unlocked!{% endif %}</h1>
+    <p>Player: <strong>{{ player_name }}</strong></p>
+    <hr>
+
+    <div class="clue-text">{{ clue }}</div>
+
+    {% if not final %}
+        <div id="scan-instructions">
+            <p>Your current objective is to figure out this clue and **find the next NFC tag!**</p>
+            <button id="scanButton" class="scan-button">Scan Next Clue</button>
+            <p id="scanStatus" class="scan-status"></p>
+        </div>
+    {% else %}
+        <h2>Congratulations! You are a master scavenger!</h2>
+        
+        {% if completion_time %}
+            <p>Your official completion time is:</p>
+            <p class="score-time">{{ completion_time }}</p>
+
+            {% if player_rank %}
+            <p class="rank-display">That puts you at rank <strong>#{{ player_rank }}</strong> on the leaderboard!</p>
+            {% endif %}
+        {% endif %}
+
+        <p><a href="{{ url_for('leaderboard') }}" style="margin-top: 20px; display: inline-block;">View Full Leaderboard</a></p>
+    {% endif %}
+
+    <script>
+        // Progressive Enhancement for Web NFC
+        document.addEventListener('DOMContentLoaded', () => {
+            if ('NDEFReader' in window) {
+                // Web NFC is supported! Show the button.
+                const scanButton = document.getElementById('scanButton');
+                scanButton.style.display = 'inline-block';
+                const scanStatus = document.getElementById('scanStatus');
+
+                scanButton.addEventListener('click', async () => {
+                    try {
+                        const ndef = new NDEFReader();
+                        scanStatus.textContent = "Ready to scan. Hold your phone near the next tag...";
+                        
+                        await ndef.scan(); // Start scanning
+
+                        ndef.addEventListener('reading', ({ message, serialNumber }) => {
+                            // Assuming the tag ID is stored as plain text in the first record
+                            const record = message.records[0];
+                            const textDecoder = new TextDecoder();
+                            const tagId = textDecoder.decode(record.data);
+
+                            scanStatus.textContent = `Tag "${tagId}" found! Navigating...`;
+                            
+                            // Redirect to the clue URL, integrating with our backend
+                            window.location.href = `/hunt/clue/${tagId}`;
+                        });
+
+                    } catch (error) {
+                        scanStatus.textContent = `Scan failed: ${error}`;
+                        console.error("Web NFC error:", error);
+                    }
+                });
+            } else {
+                // Web NFC is not supported. The default instructions are already visible.
+                console.log("Web NFC API is not supported on this browser.");
+            }
+        });
+    </script>
+</div>
+</body>
+</html>

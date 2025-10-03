@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Ocean Adventure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#1c4587"/>
+    <!-- Favicon links -->
+    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
+</head>
+<style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #38761d; }
+    input[type=text] { width: 80%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; }
+    input[type=submit] { background-color: #1c4587; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
+    #install-button { display: none; background-color: #38761d; margin-top: 15px; } /* Hidden by default */
+    .flash { padding: 1em; margin-bottom: 1em; border: 1px solid #b7e4c7; background-color: #d8f3dc; color: #1b4332; border-radius: 4px; }
+    .flash.error { border-color: #f9c6c6; background-color: #fce1e1; color: #8b0000; }
+    a { color: #1c4587; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+</style>
+<body>
+<div class="container">
+    <h1>Welcome to the Ocean Adventure!</h1>
+    <p>Enter your name to begin your adventure.</p>
+    <p style="font-size: 0.9em; color: #555; background-color: #fffbe6; border: 1px solid #ffe58f; padding: 10px; border-radius: 4px;">
+        <strong>Important:</strong> For the game to save your progress, please ensure your browser is
+        <strong>not</strong> in Private or Incognito mode.
+    </p>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="post">
+        <input type="text" name="player_name" placeholder="Your Player Name" required>
+        <br>
+        <input type="submit" value="Start Hunt!">
+    </form>
+    <hr style="margin-top: 20px;">
+    <button id="install-button" class="flash" style="cursor: pointer; font-size: 1em; border: none;">Install Ocean Adventure App</button>
+    <p><a href="{{ url_for('leaderboard') }}">View Leaderboard</a></p>
+</div>
+
+<script>
+    // Register the service worker to make the app installable
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}")
+            .then((registration) => {
+                console.log('Service Worker registered with scope:', registration.scope);
+            }).catch((error) => {
+                console.error('Service Worker registration failed:', error);
+            });
+    }
+
+    // Logic to control the PWA installation prompt
+    let deferredPrompt;
+    const installButton = document.getElementById('install-button');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent the mini-infobar from appearing on mobile
+        e.preventDefault();
+        // Stash the event so it can be triggered later.
+        deferredPrompt = e;
+        // Update UI to notify the user they can install the PWA
+        installButton.style.display = 'block';
+
+        installButton.addEventListener('click', () => {
+            // Hide our user interface that shows our A2HS button
+            installButton.style.display = 'none';
+            // Show the prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+    });
+</script>
+</body>
+</html>

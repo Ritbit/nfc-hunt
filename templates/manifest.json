@@ -1,0 +1,13 @@
+{
+  "name": "Ocean Adventure",
+  "short_name": "OceanAdv",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#1c4587",
+  "description": "An NFC-based scavenger hunt game.",
+  "icons": [
+    { "src": "/static/icon-192x192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/static/icon-512x512.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}
