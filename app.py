@@ -232,7 +232,7 @@ def check_clue(tag_id):
         # Display the clue they are currently looking for to help them get back on track
         current_clue_info = CLUES.get(current_expected_tag)
         if current_clue_info:
-            error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \"{current_clue_info['clue']}\""
+            error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{current_clue_info['clue']}\""
         else:
             error_message = "Incorrect tag scanned. Please check your current clue."
             
