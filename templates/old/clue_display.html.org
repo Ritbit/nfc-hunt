@@ -12,77 +12,29 @@
     .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     h1 { color: #38761d; }
     h2 { color: #1c4587; }
-    /* .clue-text { font-size: 1.5em; margin: 20px 0; padding: 10px; border: 1px dashed #ccc; background-color: #e6ffe6; } */
+    .clue-text { font-size: 1.5em; margin: 20px 0; padding: 10px; border: 1px dashed #ccc; background-color: #e6ffe6; }
     .scan-button { background-color: #1c4587; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2em; margin-top: 20px; display: none; /* Hidden by default */ }
     .scan-button:hover { background-color: #153566; }
     .scan-status { margin-top: 15px; color: #555; font-style: italic; }
-    /* .score-time { font-size: 2em; color: #cc0000; font-weight: bold; } */
+    .score-time { font-size: 2em; color: #cc0000; font-weight: bold; }
     .rank-display { font-size: 1.2em; margin-top: 10px; }
-
-    /* Specific styling for Clue/Success Page */
-    h1 { color: #38761d; /* Green for success */ }
-    
-    .clue-text { 
-        font-size: 1.5em; 
-        margin: 20px 0; 
-        padding: 20px; 
-        border: 3px solid #00bcd4; /* Ocean blue border */
-        background-color: #e6f7ff; /* Very light blue background */
-        border-radius: 10px;
-        font-weight: bold;
-        color: #1c1c1c;
-    }
-    
-    .score-time { 
-        font-size: 3em; 
-        font-weight: bold; 
-        padding: 10px 20px; /* Increased horizontal padding */
-        display: inline-block;
-        
-        /* UPDATED COLOR SCHEME */
-        color: #005662; /* Deep Ocean Blue for time text */
-        background-color: transparent; /* No background color */
-        border: 3px solid #00bcd4; /* Bright Turquoise border */
-        border-radius: 8px;
-    }
-    
-    .success-message {
-        color: #38761d;
-        font-size: 1.3em;
-        margin-bottom: 20px;
-    }
-    /* Ensure the H1 (Clue Unlocked!) uses a top margin after the branding block */
-    .container > h1 {
-        margin-top: 5px; 
-    }
 </style>
-<link rel="stylesheet" href="/static/ocean_adventure.css">
 <body>
-    
-    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
-    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
-    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
-    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
-    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
-
-    <img src="/static/image.png" class="fish-swimmer" alt="fish swimming">
-
-
 <div class="container">
-     <h1>{% if final %}🎉 Voyage Complete! 🎉{% else %}🗺️ Clue Unlocked! 🗺️{% endif %}</h1>
-    <p>Explorer: <strong>{{ player_name }}</strong></p>
+    <h1>{% if final %}🎉 Hunt Complete! 🎉{% else %}Clue Unlocked!{% endif %}</h1>
+    <p>Player: <strong>{{ player_name }}</strong></p>
     <hr>
 
+    <div class="clue-text">{{ clue }}</div>
 
     {% if not final %}
-        <div class="clue-text">{{ clue }}</div>
         <div id="scan-instructions">
-            <p class="success-message">Your current objective is to figure out this clue and <b>find the next fish tag</b> to continue your deep sea journey!</p>
+            <p>Your current objective is to figure out this clue and **find the next NFC tag!**</p>
             <button id="scanButton" class="scan-button">Scan Next Clue</button>
             <p id="scanStatus" class="scan-status"></p>
         </div>
     {% else %}
-        <h2>Congratulations! You are a Master Ocean Explorer!</h2>
+        <h2>Congratulations! You are a master scavenger!</h2>
         
         {% if completion_time %}
             <p>Your official completion time is:</p>
@@ -93,10 +45,7 @@
             {% endif %}
         {% endif %}
 
-        <p>
-            <a href="{{ url_for('index') }}""      style="margin-top: 20px; display: inline-block;">Back to the surface</a> | 
-            <a href="{{ url_for('leaderboard') }}" style="margin-top: 20px; display: inline-block;">View Full Leaderboard</a>
-        </p>
+        <p><a href="{{ url_for('leaderboard') }}" style="margin-top: 20px; display: inline-block;">View Full Leaderboard</a></p>
     {% endif %}
 
     <script>

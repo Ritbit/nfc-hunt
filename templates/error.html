@@ -10,18 +10,46 @@
 <style>
     body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
     .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #cc0000; }
+    h1 { color: #cc0000; /* Use a strong red for the alert */ }
+    .error-message { 
+        font-size: 1.2em; 
+        color: #8b0000; 
+        padding: 15px; 
+        background-color: #fce1e1; 
+        border: 2px solid #cc0000; 
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .error-guidance {
+        font-weight: bold;
+        color: #005662;
+    }
 </style>
+<link rel="stylesheet" href="/static/ocean_adventure.css">
 <body>
-<div class="container">
-    <h1>🚨 Scan Rejected 🚨</h1>
-    {% if player_name %}<p>Player: <strong>{{ player_name }}</strong></p>{% endif %}
-    <p>The system requires you to find the clues in the **correct sequence**.</p>
-    <hr>
-    <p><strong>Message:</strong></p>
-    <p>{{ message }}</p>
-    <p>Return to your current clue and find the correct tag!</p>
-    <p><a href="{{ url_for('index') }}">Start Over</a></p>
-</div>
+
+    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
+    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
+    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
+    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
+    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
+
+    <img src="/static/image.png" class="fish-swimmer" alt="fish swimming">
+
+    <div class="container">
+
+        <h1>🚨 Wrong Tag! 🚨</h1>
+        {% if player_name %}<p>Explorer: <strong>{{ player_name }}</strong></p>{% endif %}
+        <hr>
+        
+        <p class="error-guidance">The ocean currents are tricky! You must find the clues in the <strong>correct order</strong>.</p>
+        
+        <hr>
+        <div class="error-message">{{ message }}</div>
+        
+        <p>Return to your current location and find the correct fish tag!</p>
+        <p><a href="{{ url_for('index') }}">Back to the surface</a></p> 
+
+    </div>
 </body>
 </html>

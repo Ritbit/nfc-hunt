@@ -6,8 +6,8 @@
     /* IMPORTANT: Replace with the actual path to your font file. 
        This example assumes the file is named 'SuperOcean.woff2' 
        and located in a 'fonts' folder next to the CSS file. */
-    src: url('fonts/SuperOcean.woff2') format('woff2'),
-         url('fonts/SuperOcean.ttf') format('truetype');
+    src: url('/static/fonts/SuperOcean.woff2') format('woff2'),
+         url('/static/fonts/SuperOcean.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
 }

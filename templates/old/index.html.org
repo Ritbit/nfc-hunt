@@ -22,48 +22,32 @@
     a { color: #1c4587; text-decoration: none; }
     a:hover { text-decoration: underline; }
 </style>
-<link rel="stylesheet" href="static/ocean_adventure.css">
-
 <body>
-    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
-    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
-    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
-    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
-    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
+<div class="container">
+    <h1>Welcome to the Ocean Adventure!</h1>
+    <p>Enter your name to begin your adventure.</p>
+    <p style="font-size: 0.9em; color: #555; background-color: #fffbe6; border: 1px solid #ffe58f; padding: 10px; border-radius: 4px;">
+        <strong>Important:</strong> For the game to save your progress, please ensure your browser is
+        <strong>not</strong> in Private or Incognito mode.
+    </p>
 
-    <img src="{{ url_for('static', filename='image.png') }}" class="fish-swimmer" alt="fish swimming">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-    <div class="container">
-        <div class="title-block">
-            <div class="logo">
-                <img src="{{ url_for('static', filename='image.png') }}" alt="Ocean Adventure Fish Logo">
-            </div>
-            <h2>Ocean Adventure</h2>
-        </div>
-        
-        <p class="tagline">Dive into the fun and explore the deep blue sea!</p>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="flash {{ category }}">{{ message }}</div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <div class="start-form">
-            <p>Enter your name to start your exciting voyage.</p>
-            <form method="post">
-                <input type="text" name="player_name" placeholder="Your Explorer Name" required>
-                <br>
-                <input type="submit" value="Start Adventure!">
-            </form>
-        </div>
-
-        <hr style="margin-top: 30px;">
-        <button id="install-button" class="flash" style="cursor: pointer; font-size: 1em; border: none;">Install Ocean Adventure App</button>
-        <p><a href="{{ url_for('leaderboard') }}">View the Deep Sea Leaderboard</a></p>
-    </div>
+    <form method="post">
+        <input type="text" name="player_name" placeholder="Your Player Name" required>
+        <br>
+        <input type="submit" value="Start Hunt!">
+    </form>
+    <hr style="margin-top: 20px;">
+    <button id="install-button" class="flash" style="cursor: pointer; font-size: 1em; border: none;">Install Ocean Adventure App</button>
+    <p><a href="{{ url_for('leaderboard') }}">View Leaderboard</a></p>
+</div>
 
 <script>
     // Register the service worker to make the app installable

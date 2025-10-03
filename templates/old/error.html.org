@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Ocean Adventure - Error</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
+</head>
+<style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    h1 { color: #cc0000; }
+</style>
+<body>
+<div class="container">
+    <h1>🚨 Scan Rejected 🚨</h1>
+    {% if player_name %}<p>Player: <strong>{{ player_name }}</strong></p>{% endif %}
+    <p>The system requires you to find the clues in the **correct sequence**.</p>
+    <hr>
+    <p><strong>Message:</strong></p>
+    <p>{{ message }}</p>
+    <p>Return to your current clue and find the correct tag!</p>
+    <p><a href="{{ url_for('index') }}">Start Over</a></p>
+</div>
+</body>
+</html>
