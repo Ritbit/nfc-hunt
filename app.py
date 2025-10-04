@@ -4,7 +4,8 @@ import sqlite3
 import datetime
 import yaml
 from dateutil import parser # Used to parse timestamps from SQLite
-
+from better_profanity import profanity
+from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch list
 # --- Flask Configuration ---
 app = Flask(__name__)
 
@@ -72,6 +73,10 @@ def load_clues():
 
 CLUES = load_clues()
 
+# --- Profanity Filter Configuration ---
+# Replace the default English list with our custom Dutch wordlist.
+profanity.load_censor_words(DUTCH_PROFANITY_LIST)
+
 # --- Helper Functions & Dynamic Configuration ---
 INITIAL_TAG = next(iter(CLUES)) # Dynamically get the first tag from the clues file
 
@@ -83,6 +88,16 @@ def _format_duration(total_seconds):
 @app.route('/', methods=['GET', 'POST'])
 def index():
     """Landing page for player registration."""
+    # Check if a returning player has already finished the game.
+    player_id = session.get('player_id')
+    if player_id:
+        db = get_db()
+        player = db.execute("SELECT end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+        # If the player exists and has an end_time, they've finished.
+        if player and player['end_time']:
+            flash("Welcome back, Master Explorer! You have already completed the hunt. Here are the results.", "info")
+            return redirect(url_for('leaderboard'))
+
     if request.method == 'POST':
         player_name = request.form.get('player_name')
         if not player_name or not player_name.strip():
@@ -91,16 +106,24 @@ def index():
         
         clean_player_name = player_name.strip()
 
+        # --- Sanity Checks for Player Name ---
+        # 1. Check for inappropriate words using the better-profanity library
+        if profanity.contains_profanity(clean_player_name):
+            flash("That name contains inappropriate language. Please choose a different name.", "error")
+            return redirect(url_for('index'))
+
         db = get_db()
-        # Check if a player with this name has already completed the game
+        # 2. Check if a player with this name already exists (active or finished)
         existing_player = db.execute(
-            "SELECT player_id FROM players WHERE player_name = ? AND end_time IS NOT NULL",
+            "SELECT player_id FROM players WHERE player_name = ?",
             (clean_player_name,)
         ).fetchone()
 
         if existing_player:
-            flash(f"A player named '{clean_player_name}' has already completed the hunt. Please choose a different name or view the leaderboard.", "error")
+            flash(f"A player named '{clean_player_name}' is already on a voyage! Please choose a different name.", "error")
             return redirect(url_for('index'))
+        
+        # --- End Sanity Checks ---
 
         player_id = str(uuid.uuid4())
         session['player_id'] = player_id
@@ -109,12 +132,20 @@ def index():
         db.execute("INSERT INTO players (player_id, player_name) VALUES (?, ?)", (player_id, clean_player_name))
         db.commit()
 
-        flash(f"Welcome, {player_name.strip()}! Your hunt begins now. Find and scan the first tag to start the timer!")
-        # Redirect to a neutral page or the first clue's URL to show the message
-        return redirect(url_for('check_clue', tag_id=INITIAL_TAG))
+        # Redirect to the new start page instead of directly to the clue check
+        return redirect(url_for('start_game'))
 
     return render_template('index.html')
 
+@app.route('/start')
+def start_game():
+    """Displays the very first clue to the player before the timer starts."""
+    player_name = session.get('player_name')
+    if not player_name:
+        flash("Please register to start the hunt.", "error")
+        return redirect(url_for('index'))
+    
+    return render_template('start_game.html', player_name=player_name, first_clue=CLUES[INITIAL_TAG]['clue'])
 
 @app.route('/hunt/clue/<tag_id>')
 def check_clue(tag_id):
@@ -157,28 +188,9 @@ def check_clue(tag_id):
     
     # Check if game is already finished
     if player_row['end_time']:
-        # Game already completed, display final score again
-        start_dt = parser.parse(player_row['start_time'])
-        end_dt = parser.parse(player_row['end_time'])
-        duration = end_dt - start_dt
-        completion_time = _format_duration(duration.total_seconds())
-
-        # Recalculate rank for display
-        rank_row = db.execute(
-            '''
-            SELECT COUNT(player_id) FROM players
-            WHERE end_time IS NOT NULL AND (JULIANDAY(end_time) - JULIANDAY(start_time)) < ?
-            ''',
-            (duration.total_seconds() / 86400.0,)
-        ).fetchone()
-        player_rank = rank_row[0] + 1
-
-        return render_template('clue_display.html', 
-                               clue=CLUES[current_expected_tag]['clue'], 
-                               final=True, 
-                               player_name=player_name, 
-                               completion_time=completion_time,
-                               player_rank=player_rank)
+        # A player who has already finished scans a tag again.
+        flash("You have already completed the hunt! Here are the results.", "info")
+        return redirect(url_for('leaderboard'))
 
 
     # 4. Check if Scanned Tag is the Expected Clue
