@@ -40,7 +40,7 @@
             <h2>Ocean Adventure</h2>
         </div>
         <h1>🏆 Top Ocean Explorers 🏆</h1>
-        <table>
+        <table class="leaderboard-table">
             <tr><th>Rank</th><th class="player-name">Explorer</th><th>Time</th></tr>
             {% for player in leaderboard %}
             <tr><td class="rank">#{{ loop.index }}</td><td class="player-name">{{ player.name }}</td><td class="time">{{ player.time }}</td></tr>
