@@ -144,12 +144,26 @@ def index():
 
 @app.route('/start')
 def start_game():
-    """Displays the very first clue to the player before the timer starts."""
+    """Displays the very first clue to the player and starts the timer."""
+    player_id = session.get('player_id')
     player_name = session.get('player_name')
-    if not player_name:
+    if not player_id or not player_name:
         flash("Please register to start the hunt.", "error")
         return redirect(url_for('index'))
     
+    db = get_db()
+    player = db.execute("SELECT start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+
+    # If the player exists and their timer hasn't started yet, start it now.
+    # This is idempotent, so reloading the page won't reset the timer.
+    if player and player['start_time'] is None:
+        db.execute(
+            "UPDATE players SET start_time = CURRENT_TIMESTAMP, current_clue_tag = ? WHERE player_id = ?",
+            (INITIAL_TAG, player_id)
+        )
+        db.commit()
+        flash("Your timer has started! Good luck!", "info")
+
     return render_template('start_game.html', player_name=player_name, first_clue=CLUES[INITIAL_TAG]['clue'])
 
 def _get_player_from_session(db):
@@ -207,13 +221,6 @@ def check_clue(tag_id):
     if player_row['end_time']:
         flash("You have already completed the hunt! Here are the results.", "info")
         return redirect(url_for('leaderboard'))
-
-    # Handle the very first scan that starts the game timer
-    if player_row['start_time'] is None:
-        if tag_id != INITIAL_TAG:
-            return render_template('error.html', message=f"To start the game, you must scan the first tag ({INITIAL_TAG}).", player_name=player_name)
-        db.execute("UPDATE players SET current_clue_tag = ?, start_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (tag_id, player_id))
-        db.commit()
 
     # Re-fetch player data to get the current expected tag
     player_row = db.execute("SELECT current_clue_tag FROM players WHERE player_id = ?", (player_id,)).fetchone()
