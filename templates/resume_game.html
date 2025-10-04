@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}The Hunt Begins! - Ocean Adventure{% endblock %}
+{% block title %}Welcome Back! - Ocean Adventure{% endblock %}
 
 {% block head_styles %}
 <style>
-    /* Styles specific to this page can be moved to ocean_adventure.css if preferred */
+    /* These styles are specific to the resume page and could be moved to ocean_adventure.css */
     .clue-text { 
         font-size: 1.5em; margin: 20px 0; padding: 20px; 
         border: 3px solid #00bcd4; background-color: #e6f7ff;
         border-radius: 10px; font-weight: bold; white-space: pre-wrap; color: #1c1c1c;
     }
-    .instructions { color: #38761d; font-size: 1.3em; margin-bottom: 20px; font-weight: bold; }
+    .instructions { color: #1976d2; font-size: 1.3em; margin-bottom: 20px; font-weight: bold; }
     .scan-button { background-color: #1c4587; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2em; margin-top: 20px; display: none; }
     .scan-status { margin-top: 15px; color: #555; font-style: italic; }
 </style>
@@ -18,14 +18,14 @@
 
 {% block content %}
     <div class="container">
-        <h1>🗺️ Your Voyage Begins! 🗺️</h1>
-        <p>Welcome, Explorer <strong>{{ player_name }}</strong>!</p>
+        <h1>🌊 Welcome Back, Explorer! 🌊</h1>
+        <p>Welcome back, <strong>{{ player_name }}</strong>! Your voyage is still in progress.</p>
         <hr>
-        <p class="instructions">Your timer is running, here is your first clue:</p>
-        <div class="clue-text">{{ first_clue }}</div>
+        <p class="instructions">Here is your current objective:</p>
+        <div class="clue-text">{{ current_clue }}</div>
         <div id="scan-instructions">
-            <p>Figure out the clue, find the fish tag, and scan it to begin!</p>
-            <button id="scanButton" class="scan-button">Scan First Tag</button>
+            <p>Figure out the clue, find the fish tag, and scan it to continue your journey!</p>
+            <button id="scanButton" class="scan-button">Scan Tag</button>
             <p id="scanStatus" class="scan-status"></p>
         </div>
     </div>
@@ -33,6 +33,7 @@
 
 {% block scripts %}
 <script>
+    // Re-using the same WebNFC script from other pages
     document.addEventListener('DOMContentLoaded', () => {
         if ('NDEFReader' in window) {
             const scanButton = document.getElementById('scanButton');
@@ -41,12 +42,11 @@
             scanButton.addEventListener('click', async () => {
                 try {
                     const ndef = new NDEFReader();
-                    scanStatus.textContent = "Ready to scan. Hold your phone near the first tag...";
+                    scanStatus.textContent = "Ready to scan. Hold your phone near the tag...";
                     await ndef.scan();
                     ndef.addEventListener('reading', ({ message }) => {
                         const textDecoder = new TextDecoder();
                         const tagId = textDecoder.decode(message.records[0].data);
-                        scanStatus.textContent = `Tag "${tagId}" found! Starting timer...`;
                         window.location.href = `/hunt/clue/${tagId}`;
                     });
                 } catch (error) {

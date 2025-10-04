@@ -99,6 +99,9 @@ def index():
             if player['end_time']:
                 flash("Welcome back, Master Explorer! You have already completed the hunt. Here are the results.", "info")
                 return redirect(url_for('leaderboard'))
+            else:
+                # Player is active but not finished. Restore their session.
+                return redirect(url_for('resume_game'))
         else:
             # The player_id in the cookie is invalid (not in DB). Clear the stale session.
             session.clear()
@@ -165,6 +168,26 @@ def start_game():
         flash("Your timer has started! Good luck!", "info")
 
     return render_template('start_game.html', player_name=player_name, first_clue=CLUES[INITIAL_TAG]['clue'])
+
+@app.route('/resume')
+def resume_game():
+    """Shows a returning player their current clue."""
+    player_id = session.get('player_id')
+    if not player_id:
+        # No session, send them to the start
+        return redirect(url_for('index'))
+
+    db = get_db()
+    player = db.execute("SELECT player_name, current_clue_tag FROM players WHERE player_id = ?", (player_id,)).fetchone()
+
+    if not player:
+        session.clear()
+        return redirect(url_for('index'))
+
+    # The player's current clue is the one for the tag they are looking for.
+    current_clue_tag = player['current_clue_tag'] or INITIAL_TAG
+    current_clue_text = CLUES[current_clue_tag]['clue']
+    return render_template('resume_game.html', player_name=player['player_name'], current_clue=current_clue_text)
 
 def _get_player_from_session(db):
     """Authenticates a player from the session and fetches their DB record."""
@@ -316,6 +339,47 @@ def admin_reset():
     session.clear()
     session['admin_logged_in'] = True # Keep the admin logged in
     flash("Database has been successfully reset. All player data is gone.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/remove_player/<player_id>', methods=['POST'])
+def admin_remove_player(player_id):
+    """Removes a player from the database."""
+    if not session.get('admin_logged_in'):
+        return "Unauthorized", 403
+    
+    db = get_db()
+    db.execute("DELETE FROM players WHERE player_id = ?", (player_id,))
+    db.commit()
+    
+    flash(f"Player has been successfully removed.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/change_name/<player_id>', methods=['POST'])
+def admin_change_name(player_id):
+    """Changes a player's name."""
+    if not session.get('admin_logged_in'):
+        return "Unauthorized", 403
+
+    new_name = request.form.get('new_name', '').strip()
+
+    if not new_name:
+        flash("Player name cannot be empty.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    if profanity.contains_profanity(new_name):
+        flash("The new name contains inappropriate language.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    db = get_db()
+    # Optional: Check if the new name is already taken by another player
+    existing = db.execute("SELECT player_id FROM players WHERE player_name = ? AND player_id != ?", (new_name, player_id)).fetchone()
+    if existing:
+        flash(f"The name '{new_name}' is already in use by another player.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    db.execute("UPDATE players SET player_name = ? WHERE player_id = ?", (new_name, player_id))
+    db.commit()
+    flash("Player name has been updated successfully.", "info")
     return redirect(url_for('admin_dashboard'))
 
 @app.errorhandler(404)

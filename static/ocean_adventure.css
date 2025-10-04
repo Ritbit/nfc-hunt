@@ -129,6 +129,11 @@ input[type=submit]:hover {
     background-color: #fce1e1;
     color: #8b0000;
 }
+.flash.info {
+    border-color: #a6d8f0; /* Light blue border */
+    background-color: #e0f7fa; /* Very light cyan background */
+    color: #007791; /* Dark cyan text */
+}
 
 /* Links */
 a {

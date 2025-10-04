@@ -1,56 +1,28 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Ocean Adventure - Error</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
-</head>
+{% extends "base.html" %}
+
+{% block title %}Error - Ocean Adventure{% endblock %}
+
+{% block head_styles %}
 <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #cc0000; /* Use a strong red for the alert */ }
+    /* These styles are specific to the error page and could be moved to ocean_adventure.css */
     .error-message { 
-        font-size: 1.2em; 
-        color: #8b0000; 
-        padding: 15px; 
-        background-color: #fce1e1; 
-        border: 2px solid #cc0000; 
-        border-radius: 8px;
-        margin-bottom: 20px;
-        white-space: pre-wrap; /* This will render newlines from the clue text */
+        font-size: 1.2em; color: #8b0000; padding: 15px; 
+        background-color: #fce1e1; border: 2px solid #cc0000; 
+        border-radius: 8px; margin-bottom: 20px; white-space: pre-wrap;
     }
-    .error-guidance {
-        font-weight: bold;
-        color: #005662;
-    }
+    .error-guidance { font-weight: bold; color: #005662; }
 </style>
-<link rel="stylesheet" href="/static/ocean_adventure.css">
-<body>
+{% endblock %}
 
-    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
-    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
-    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
-    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
-    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
-
-    <img src="/static/image.png" class="fish-swimmer" alt="fish swimming">
-
+{% block content %}
     <div class="container">
-
         <h1>🚨 Wrong Tag! 🚨</h1>
         {% if player_name %}<p>Explorer: <strong>{{ player_name }}</strong></p>{% endif %}
         <hr>
-        
         <p class="error-guidance">The ocean currents are tricky! You must find the clues in the <strong>correct order</strong>.</p>
-        
         <hr>
         <div class="error-message">{{ message }}</div>
-        
         <p>Return to your current location and find the correct fish tag!</p>
         <p><a href="{{ url_for('index') }}">Back to the surface</a></p> 
-
     </div>
-</body>
-</html>
+{% endblock %}

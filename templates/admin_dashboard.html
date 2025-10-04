@@ -44,6 +44,13 @@
 
     /* Login form styling */
     .login-form { max-width: 400px; margin: 50px auto; }
+
+    /* Action button styling */
+    .action-button { background-color: #546e7a; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+    .action-button.remove { background-color: #e53935; }
+    .action-button:hover { opacity: 0.8; }
+    .name-input { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
+
 </style>
 {% endblock %}
 
@@ -76,6 +83,7 @@
                     <th>Start Time</th>
                     <th>End Time</th>
                     <th>Total Duration</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,7 +91,7 @@
                 <tr>
                     <td>{{ player.player_name }}</td>
                     <td>
-                        {% if player.end_time %}
+                        {% if player.current_clue_tag == 'FINISHED' %}
                             <span class="status-finished">Finished</span>
                         {% else %}
                             <span class="status-active">Active: {{ player.current_clue_tag or 'Not Started' }}</span>
@@ -92,6 +100,15 @@
                     <td>{{ player.start_time or 'N/A' }}</td>
                     <td>{{ player.end_time or 'N/A' }}</td>
                     <td>{{ format_duration(player.duration) if player.duration else 'N/A' }}</td>
+                    <td>
+                        <form method="post" action="{{ url_for('admin_change_name', player_id=player.player_id) }}" style="display: inline-block; margin-right: 5px;">
+                            <input type="text" name="new_name" value="{{ player.player_name }}" class="name-input" size="15">
+                            <button type="submit" class="action-button">Rename</button>
+                        </form>
+                        <form method="post" action="{{ url_for('admin_remove_player', player_id=player.player_id) }}" style="display: inline-block;" onsubmit="return confirm('Are you sure you want to permanently remove {{ player.player_name }}?');">
+                            <button type="submit" class="action-button remove">Remove</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
