@@ -93,10 +93,14 @@ def index():
     if player_id:
         db = get_db()
         player = db.execute("SELECT end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
-        # If the player exists and has an end_time, they've finished.
-        if player and player['end_time']:
-            flash("Welcome back, Master Explorer! You have already completed the hunt. Here are the results.", "info")
-            return redirect(url_for('leaderboard'))
+        if player:
+            # If the player exists in the DB and has an end_time, they've finished.
+            if player['end_time']:
+                flash("Welcome back, Master Explorer! You have already completed the hunt. Here are the results.", "info")
+                return redirect(url_for('leaderboard'))
+        else:
+            # The player_id in the cookie is invalid (not in DB). Clear the stale session.
+            session.clear()
 
     if request.method == 'POST':
         player_name = request.form.get('player_name')
