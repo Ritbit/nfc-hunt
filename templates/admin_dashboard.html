@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard - Ocean Adventure{% endblock %}
+
+{% block head_styles %}
+<style>
+    /* Styles for the admin dashboard table */
+    .admin-container { max-width: 90%; }
+    table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-top: 20px; 
+        border: 2px solid #455a64;
+        border-radius: 8px;
+        overflow: hidden;
+        font-size: 0.9em;
+    }
+    th, td { 
+        padding: 10px; 
+        border-bottom: 1px solid #cfd8dc;
+        text-align: left;
+    }
+    th { 
+        background-color: #37474f;
+        color: white; 
+    }
+    tr:nth-child(even) { background-color: #eceff1; }
+    tr:hover { background-color: #b0bec5; }
+    .status-finished { color: #2e7d32; font-weight: bold; }
+    .status-active { color: #1976d2; font-weight: bold; }
+
+    /* Reset button styling */
+    .reset-form { margin-top: 30px; padding: 20px; border: 2px dashed #c62828; background-color: #ffebee; border-radius: 8px; }
+    .reset-button {
+        background-color: #c62828;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1.1em;
+        cursor: pointer;
+    }
+    .reset-button:hover { background-color: #b71c1c; }
+
+    /* Login form styling */
+    .login-form { max-width: 400px; margin: 50px auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container {% if admin_logged_in %}admin-container{% else %}login-form{% endif %}">
+    <h1>🔑 Admin Dashboard 🔑</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    {% if not admin_logged_in %}
+        <p>Please enter the password to access the dashboard.</p>
+        <form method="post">
+            <input type="password" name="password" placeholder="Password" required style="width: 70%; padding: 10px;">
+            <br><br>
+            <input type="submit" value="Login">
+        </form>
+    {% else %}
+        <p>Welcome, Admin! Here is the current status of all explorers.</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Player Name</th>
+                    <th>Status / Current Clue</th>
+                    <th>Start Time</th>
+                    <th>End Time</th>
+                    <th>Total Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in players %}
+                <tr>
+                    <td>{{ player.player_name }}</td>
+                    <td>
+                        {% if player.end_time %}
+                            <span class="status-finished">Finished</span>
+                        {% else %}
+                            <span class="status-active">Active: {{ player.current_clue_tag or 'Not Started' }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ player.start_time or 'N/A' }}</td>
+                    <td>{{ player.end_time or 'N/A' }}</td>
+                    <td>{{ format_duration(player.duration) if player.duration else 'N/A' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <form class="reset-form" method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('Are you absolutely sure you want to reset the entire game? All player data will be permanently deleted.');">
+            <h2>Reset Game Database</h2>
+            <p>This action will delete all player data and reset the game. This cannot be undone.</p>
+            <button type="submit" class="reset-button">Reset Database</button>
+        </form>
+    {% endif %}
+</div>
+{% endblock %}

@@ -6,6 +6,7 @@ import yaml
 from dateutil import parser # Used to parse timestamps from SQLite
 from better_profanity import profanity
 from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch list
+from reset_db import reset_database # Import the reset function
 # --- Flask Configuration ---
 app = Flask(__name__)
 
@@ -265,6 +266,56 @@ def leaderboard():
         minutes, seconds = divmod(int(row['duration']), 60)
         leaderboard_data.append({'name': row['player_name'], 'time': f"{minutes}m {seconds}s"})
     return render_template('leaderboard.html', leaderboard=leaderboard_data)
+
+@app.route('/admin/dashboard', methods=['GET', 'POST'])
+def admin_dashboard():
+    """A password-protected dashboard to view all player data."""
+    ADMIN_PASSWORD = "bruinvis"
+
+    if request.method == 'POST':
+        if request.form.get('password') == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            flash("Login successful!", "info")
+            return redirect(url_for('admin_dashboard'))
+        else:
+            flash("Incorrect password.", "error")
+
+    if not session.get('admin_logged_in'):
+        return render_template('admin_dashboard.html', admin_logged_in=False)
+
+    # If logged in, show the dashboard
+    db = get_db()
+    all_players = db.execute('''
+        SELECT 
+            player_name, 
+            current_clue_tag, 
+            start_time, 
+            end_time, 
+            (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
+        FROM players 
+        ORDER BY start_time DESC
+    ''').fetchall()
+
+    return render_template('admin_dashboard.html', players=all_players, format_duration=_format_duration, admin_logged_in=True)
+
+@app.route('/admin/reset', methods=['POST'])
+def admin_reset():
+    """Handles the database reset action from the admin dashboard."""
+    if not session.get('admin_logged_in'):
+        return "Unauthorized", 403
+    
+    reset_database()
+    # Clear all user sessions to prevent "ghost session" issues after a reset
+    session.clear()
+    session['admin_logged_in'] = True # Keep the admin logged in
+    flash("Database has been successfully reset. All player data is gone.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """Custom 404 handler to redirect to the index page."""
+    flash("The page you were looking for could not be found. Let's start over!", "error")
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     # For testing, run with: python3 app.py

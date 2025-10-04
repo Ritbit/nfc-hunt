@@ -1,76 +1,31 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Ocean Adventure - Clue Found!</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
-</head>
-<style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #38761d; }
-    h2 { color: #1c4587; }
-    /* .clue-text { font-size: 1.5em; margin: 20px 0; padding: 10px; border: 1px dashed #ccc; background-color: #e6ffe6; } */
-    .scan-button { background-color: #1c4587; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2em; margin-top: 20px; display: none; /* Hidden by default */ }
-    .scan-button:hover { background-color: #153566; }
-    .scan-status { margin-top: 15px; color: #555; font-style: italic; }
-    /* .score-time { font-size: 2em; color: #cc0000; font-weight: bold; } */
-    .rank-display { font-size: 1.2em; margin-top: 10px; }
+{% extends "base.html" %}
 
-    /* Specific styling for Clue/Success Page */
-    h1 { color: #38761d; /* Green for success */ }
-    
-    .clue-text { 
-        font-size: 1.5em; 
-        margin: 20px 0; 
-        padding: 20px; 
-        border: 3px solid #00bcd4; /* Ocean blue border */
-        background-color: #e6f7ff; /* Very light blue background */
-        border-radius: 10px;
-        font-weight: bold;
-        white-space: pre-wrap; /* This will render newlines from the YAML */
-        color: #1c1c1c;
-    }
-    
-    .score-time { 
-        font-size: 3em; 
-        font-weight: bold; 
-        padding: 10px 20px; /* Increased horizontal padding */
-        display: inline-block;
-        
-        /* UPDATED COLOR SCHEME */
-        color: #005662; /* Deep Ocean Blue for time text */
-        background-color: transparent; /* No background color */
-        border: 3px solid #00bcd4; /* Bright Turquoise border */
-        border-radius: 8px;
-    }
-    
-    .success-message {
-        color: #38761d;
-        font-size: 1.3em;
-        margin-bottom: 20px;
-    }
-    /* Ensure the H1 (Clue Unlocked!) uses a top margin after the branding block */
-    .container > h1 {
-        margin-top: 5px; 
-    }
-</style>
-<link rel="stylesheet" href="/static/ocean_adventure.css">
-<body>
-    
-    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
-    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
-    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
-    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
-    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
+{% block title %}
+    {% if final %}Voyage Complete!{% else %}Clue Found!{% endif %} - Ocean Adventure
+{% endblock %}
 
-    <img src="/static/image.png" class="fish-swimmer" alt="fish swimming">
+{% block head_styles %}
+    <style>
+        /* These styles are specific to the clue page and could be moved to ocean_adventure.css */
+        .clue-text { 
+            font-size: 1.5em; margin: 20px 0; padding: 20px; 
+            border: 3px solid #00bcd4; background-color: #e6f7ff;
+            border-radius: 10px; font-weight: bold; white-space: pre-wrap; color: #1c1c1c;
+        }
+        .score-time { 
+            font-size: 3em; font-weight: bold; padding: 10px 20px; display: inline-block;
+            color: #005662; background-color: transparent; border: 3px solid #00bcd4; border-radius: 8px;
+        }
+        .success-message { color: #38761d; font-size: 1.3em; margin-bottom: 20px; }
+        .scan-button { background-color: #1c4587; color: white; padding: 15px 25px; border: none; border-radius: 8px; cursor: pointer; font-size: 1.2em; margin-top: 20px; display: none; }
+        .scan-status { margin-top: 15px; color: #555; font-style: italic; }
+        .rank-display { font-size: 1.2em; margin-top: 10px; }
+    </style>
+{% endblock %}
 
-
+{% block content %}
 <div class="container">
-     <h1>{% if final %}🎉 Voyage Complete! 🎉{% else %}🗺️ Clue Unlocked! 🗺️{% endif %}</h1>
+    <h1>{% if final %}🎉 Voyage Complete! 🎉{% else %}🗺️ Clue Unlocked! 🗺️{% endif %}</h1>
     <p>Explorer: <strong>{{ player_name }}</strong></p>
     <hr>
 
@@ -100,11 +55,14 @@
         </p>
     {% endif %}
 
-    <script>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
         // Progressive Enhancement for Web NFC
         document.addEventListener('DOMContentLoaded', () => {
             if ('NDEFReader' in window) {
-                // Web NFC is supported! Show the button.
                 const scanButton = document.getElementById('scanButton');
                 scanButton.style.display = 'inline-block';
                 const scanStatus = document.getElementById('scanStatus');
@@ -113,32 +71,19 @@
                     try {
                         const ndef = new NDEFReader();
                         scanStatus.textContent = "Ready to scan. Hold your phone near the next tag...";
-                        
-                        await ndef.scan(); // Start scanning
-
-                        ndef.addEventListener('reading', ({ message, serialNumber }) => {
-                            // Assuming the tag ID is stored as plain text in the first record
-                            const record = message.records[0];
+                        await ndef.scan();
+                        ndef.addEventListener('reading', ({ message }) => {
                             const textDecoder = new TextDecoder();
-                            const tagId = textDecoder.decode(record.data);
-
+                            const tagId = textDecoder.decode(message.records[0].data);
                             scanStatus.textContent = `Tag "${tagId}" found! Navigating...`;
-                            
-                            // Redirect to the clue URL, integrating with our backend
                             window.location.href = `/hunt/clue/${tagId}`;
                         });
-
                     } catch (error) {
                         scanStatus.textContent = `Scan failed: ${error}`;
                         console.error("Web NFC error:", error);
                     }
                 });
-            } else {
-                // Web NFC is not supported. The default instructions are already visible.
-                console.log("Web NFC API is not supported on this browser.");
             }
         });
-    </script>
-</div>
-</body>
-</html>
+</script>
+{% endblock %}
