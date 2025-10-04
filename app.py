@@ -147,110 +147,100 @@ def start_game():
     
     return render_template('start_game.html', player_name=player_name, first_clue=CLUES[INITIAL_TAG]['clue'])
 
+def _get_player_from_session(db):
+    """Authenticates a player from the session and fetches their DB record."""
+    player_id = session.get('player_id')
+    if not player_id:
+        return None, None
+    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    if not player_row:
+        session.clear()
+        return None, None
+    return player_id, player_row
+
+def _handle_incorrect_scan(player_name, current_expected_tag):
+    """Generates the response for scanning the wrong tag."""
+    current_clue_info = CLUES.get(current_expected_tag)
+    if current_clue_info:
+        error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{current_clue_info['clue']}\""
+    else:
+        error_message = "Incorrect tag scanned. Please check your current clue."
+    return render_template('error.html', message=error_message, player_name=player_name)
+
+def _handle_final_scan(db, player_id):
+    """Handles the logic for the final, game-winning scan."""
+    db.execute("UPDATE players SET current_clue_tag = 'FINISHED', end_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (player_id,))
+    db.commit()
+
+    final_times = db.execute("SELECT start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    start_dt = parser.parse(final_times['start_time'])
+    end_dt = parser.parse(final_times['end_time'])
+    duration = end_dt - start_dt
+    
+    rank_row = db.execute(
+        '''
+        SELECT COUNT(player_id) FROM players
+        WHERE end_time IS NOT NULL AND (JULIANDAY(end_time) - JULIANDAY(start_time)) < ?
+        ''',
+        (duration.total_seconds() / 86400.0,)
+    ).fetchone()
+    
+    return _format_duration(duration.total_seconds()), rank_row[0] + 1
+
 @app.route('/hunt/clue/<tag_id>')
 def check_clue(tag_id):
-    # 1. Identify Player
-    player_id = session.get('player_id')
-    player_name = session.get('player_name')
-    
-    if not player_id:
-        # If a player tries to scan a tag without registering first
-        flash("Please register with a player name to start the hunt!")
-        return redirect(url_for('index'))
-
     db = get_db()
-    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
-    
-    if not player_row:
-        # Fallback for corrupted session/DB state
-        session.clear()
-        flash("Player session error. Please register again.")
+    player_id, player_row = _get_player_from_session(db)
+
+    if not player_id:
+        flash("Please register with a player name to start the hunt!", "error")
         return redirect(url_for('index'))
 
-    # 2. Game Start Logic
-    # If start_time is NULL, this is the first scan that starts the game.
-    if player_row['start_time'] is None:
-        if tag_id != INITIAL_TAG:
-            return render_template('error.html', message=f"To start the game, you must scan the first tag ({INITIAL_TAG}).", player_name=player_name)
-        # START GAME: Record start_time and set current_clue_tag
-        db.execute("UPDATE players SET current_clue_tag = ?, start_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (tag_id, player_id))
-        db.commit()
-        # Re-fetch player data after update
-        player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player_name = player_row['player_name']
 
-    # 3. Process Scan
-    current_expected_tag = player_row['current_clue_tag'] or INITIAL_TAG
-    clue_data = CLUES.get(tag_id)
-
-    if not clue_data:
-        # Scanned an unknown tag
-        return render_template('error.html', message="This tag is not active in the current hunt.", player_name=player_name)
-    
-    # Check if game is already finished
+    # Handle players who have already finished
     if player_row['end_time']:
-        # A player who has already finished scans a tag again.
         flash("You have already completed the hunt! Here are the results.", "info")
         return redirect(url_for('leaderboard'))
 
-
-    # 4. Check if Scanned Tag is the Expected Clue
-    if tag_id == current_expected_tag:
-        # Success! Player found the correct tag in order.
-        
-        next_tag_id = clue_data['next_tag']
-        completion_time = None
-        player_rank = None
-        
-        if next_tag_id:
-            # Update progress to the next tag
-            db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (next_tag_id, player_id))
-            
-        else:
-            # GAME FINISHED (Final tag)
-            db.execute("UPDATE players SET current_clue_tag = 'FINISHED', end_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (player_id,))
-            db.commit() # Commit before reading
-            
-            # Fetch the final times from the DB to ensure consistency
-            final_times = db.execute("SELECT start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
-            start_dt = parser.parse(final_times['start_time'])
-            end_dt = parser.parse(final_times['end_time'])
-            duration = end_dt - start_dt
-            completion_time = _format_duration(duration.total_seconds())
-
-            # Calculate player's rank
-            # The rank is 1 + the number of players who finished with a shorter time.
-            # We compare the duration in days, which is what JULIANDAY subtraction yields.
-            rank_row = db.execute(
-                '''
-                SELECT COUNT(player_id) FROM players
-                WHERE end_time IS NOT NULL AND (JULIANDAY(end_time) - JULIANDAY(start_time)) < ?
-                ''',
-                (duration.total_seconds() / 86400.0,)
-            ).fetchone()
-            player_rank = rank_row[0] + 1
-
+    # Handle the very first scan that starts the game timer
+    if player_row['start_time'] is None:
+        if tag_id != INITIAL_TAG:
+            return render_template('error.html', message=f"To start the game, you must scan the first tag ({INITIAL_TAG}).", player_name=player_name)
+        db.execute("UPDATE players SET current_clue_tag = ?, start_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (tag_id, player_id))
         db.commit()
-        
-        # Display the clue
-        return render_template('clue_display.html', 
-                               clue=clue_data['clue'], 
-                               final=clue_data['final'], 
-                               player_name=player_name, 
-                               completion_time=completion_time,
-                               player_rank=player_rank)
-    
-    elif tag_id != current_expected_tag:
-        # Player scanned an incorrect tag (out of order)
-        # Display the clue they are currently looking for to help them get back on track
-        current_clue_info = CLUES.get(current_expected_tag)
-        if current_clue_info:
-            error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{current_clue_info['clue']}\""
-        else:
-            error_message = "Incorrect tag scanned. Please check your current clue."
-            
-        return render_template('error.html', message=error_message, player_name=player_name)
 
-    return render_template('error.html', message="An unexpected game state occurred.", player_name=player_name)
+    # Re-fetch player data to get the current expected tag
+    player_row = db.execute("SELECT current_clue_tag FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    current_expected_tag = player_row['current_clue_tag']
+
+    # Validate the scanned tag
+    if tag_id != current_expected_tag:
+        return _handle_incorrect_scan(player_name, current_expected_tag)
+
+    # --- SUCCESS: Correct tag was scanned ---
+    clue_data = CLUES.get(tag_id)
+    if not clue_data:
+        return render_template('error.html', message="This tag is not active in the current hunt.", player_name=player_name)
+
+    next_tag_id = clue_data['next_tag']
+    completion_time, player_rank = None, None
+
+    if next_tag_id:
+        # Update progress to the next tag
+        db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (next_tag_id, player_id))
+    else:
+        # This is the final tag, end the game
+        completion_time, player_rank = _handle_final_scan(db, player_id)
+
+    db.commit()
+
+    return render_template('clue_display.html',
+                           clue=clue_data['clue'],
+                           final=clue_data['final'],
+                           player_name=player_name,
+                           completion_time=completion_time,
+                           player_rank=player_rank)
 
 @app.route('/leaderboard')
 def leaderboard():

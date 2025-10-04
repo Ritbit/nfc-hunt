@@ -1,5 +1,7 @@
+#!/bin/env python3
 import os
 import sqlite3
+from pwd import getpwnam
 
 # --- Configuration ---
 # This script assumes it's in the same directory as app.py and the database.
@@ -34,6 +36,9 @@ def reset_database():
     ''')
     conn.commit()
     conn.close()
+    uid = getpwnam('adyen').pw_uid
+    gid = getpwnam('nginx').pw_gid
+    os.chown(DATABASE,uid,gid)
     print("Database has been reset successfully.")
 
 if __name__ == '__main__':

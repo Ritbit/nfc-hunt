@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    {# The title block can be overridden by child templates #}
+    <title>{% block title %}Ocean Adventure{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <meta name="theme-color" content="#1c4587"/>
+    
+    <!-- Favicon links -->
+    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
+    
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='ocean_adventure.css') }}">
+
+    {# This block allows child templates to add their own styles #}
+    {% block head_styles %}{% endblock %}
+</head>
+<body>
+    <!-- Shared background animations -->
+    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
+    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
+    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
+    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
+    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
+    <img src="{{ url_for('static', filename='image.png') }}" class="fish-swimmer" alt="fish swimming">
+
+    {# The main content block to be filled by child templates #}
+    {% block content %}{% endblock %}
+
+    {# A block for page-specific scripts #}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,38 +1,15 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Ocean Adventure</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#1c4587"/>
-    <!-- Favicon links -->
-    <link rel="icon" href="{{ url_for('static', filename='fish.png') }}" type="image/png">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='fish.png') }}">
-</head>
+{% extends "base.html" %}
+
+{% block head_styles %}
 <style>
-    body { font-family: sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
-    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #38761d; }
+    /* These styles are specific to the index page and can be moved to ocean_adventure.css */
     input[type=text] { width: 80%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #ccc; }
     input[type=submit] { background-color: #1c4587; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 1em; }
     #install-button { display: none; background-color: #38761d; margin-top: 15px; } /* Hidden by default */
-    .flash { padding: 1em; margin-bottom: 1em; border: 1px solid #b7e4c7; background-color: #d8f3dc; color: #1b4332; border-radius: 4px; }
-    .flash.error { border-color: #f9c6c6; background-color: #fce1e1; color: #8b0000; }
-    a { color: #1c4587; text-decoration: none; }
-    a:hover { text-decoration: underline; }
 </style>
-<link rel="stylesheet" href="static/ocean_adventure.css">
+{% endblock %}
 
-<body>
-    <div class="bubble" style="left: 10%; animation-duration: 12s; animation-delay: 0s;"></div>
-    <div class="bubble" style="left: 20%; animation-duration: 9s; animation-delay: 2s;"></div>
-    <div class="bubble" style="left: 40%; animation-duration: 14s; animation-delay: 4s;"></div>
-    <div class="bubble" style="left: 60%; animation-duration: 10s; animation-delay: 1s;"></div>
-    <div class="bubble" style="left: 80%; animation-duration: 11s; animation-delay: 3s;"></div>
-
-    <img src="{{ url_for('static', filename='image.png') }}" class="fish-swimmer" alt="fish swimming">
-
+{% block content %}
     <div class="container">
         <div class="title-block">
             <div class="logo">
@@ -64,7 +41,9 @@
         <button id="install-button" class="flash" style="cursor: pointer; font-size: 1em; border: none;">Install Ocean Adventure App</button>
         <p><a href="{{ url_for('leaderboard') }}">View the Deep Sea Leaderboard</a></p>
     </div>
+{% endblock %}
 
+{% block scripts %}
 <script>
     // Register the service worker to make the app installable
     if ('serviceWorker' in navigator) {
@@ -103,5 +82,4 @@
         });
     });
 </script>
-</body>
-</html>
+{% endblock %}
