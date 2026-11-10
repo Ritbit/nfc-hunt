@@ -3,4 +3,5 @@ PyYAML
 python-dateutil
 better-profanity
 profanity-wordlists
+qrcode
 gunicorn  # For production

@@ -30,7 +30,8 @@ def reset_database():
             current_clue_tag TEXT,
             last_scan_time DATETIME,
             start_time DATETIME,
-            end_time DATETIME
+            end_time DATETIME,
+            wrong_scans INTEGER NOT NULL DEFAULT 0
         )
     ''')
     conn.execute(

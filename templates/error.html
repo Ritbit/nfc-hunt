@@ -11,6 +11,12 @@
         border-radius: 8px; margin-bottom: 20px; white-space: pre-wrap;
     }
     .error-guidance { font-weight: bold; color: #005662; }
+    .container { animation: error-shake 0.4s ease-in-out; }
+    @keyframes error-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+    }
 </style>
 {% endblock %}
 
@@ -23,6 +29,12 @@
         <hr>
         <div class="error-message">{{ message }}</div>
         <p>Return to your current location and find the correct fish tag!</p>
-        <p><a href="{{ url_for('index') }}">Back to the surface</a></p> 
+        <p><a href="{{ url_for('index') }}">Back to the surface</a></p>
     </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    if (navigator.vibrate) navigator.vibrate([80, 50, 80]);
+</script>
 {% endblock %}

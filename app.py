@@ -8,9 +8,13 @@ from better_profanity import profanity
 from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch list
 from reset_db import reset_database # Import the reset function
 import math
+import io
 import secrets
 import shutil
 import time
+
+import qrcode
+import qrcode.image.svg
 from collections import defaultdict
 # --- Flask Configuration ---
 app = Flask(__name__)
@@ -68,6 +72,8 @@ def init_db():
         if 'player_name' not in columns:
             # Add the column. The NOT NULL constraint requires a default value for existing rows.
             db.execute('ALTER TABLE players ADD COLUMN player_name TEXT NOT NULL DEFAULT "Old Player"')
+        if 'wrong_scans' not in columns:
+            db.execute('ALTER TABLE players ADD COLUMN wrong_scans INTEGER NOT NULL DEFAULT 0')
 
         # 3. Enforce case-insensitive uniqueness of player names at the DB level,
         #    so concurrent registrations can't slip past the check-then-insert.
@@ -360,14 +366,16 @@ def _get_player_from_session(db):
     player_id = session.get('player_id')
     if not player_id:
         return None, None
-    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time, wrong_scans FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player_row:
         session.clear()
         return None, None
     return player_id, player_row
 
-def _handle_incorrect_scan(player_name, current_expected_tag):
+def _handle_incorrect_scan(db, player_id, player_name, current_expected_tag):
     """Generates the response for scanning the wrong tag."""
+    db.execute("UPDATE players SET wrong_scans = wrong_scans + 1 WHERE player_id = ?", (player_id,))
+    db.commit()
     current_clue_info = CLUES.get(current_expected_tag)
     if current_clue_info:
         error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{clue_text(current_expected_tag)}\""
@@ -418,7 +426,7 @@ def check_clue(tag_id):
     # treat the scan as a correct first find.
     if current_expected_tag is None:
         if tag_id != INITIAL_TAG:
-            return _handle_incorrect_scan(player_name, INITIAL_TAG)
+            return _handle_incorrect_scan(db, player_id, player_name, INITIAL_TAG)
         db.execute(
             "UPDATE players SET start_time = DATETIME('now'), current_clue_tag = ? WHERE player_id = ?",
             (INITIAL_TAG, player_id)
@@ -428,7 +436,7 @@ def check_clue(tag_id):
 
     # Validate the scanned tag
     if tag_id != current_expected_tag:
-        return _handle_incorrect_scan(player_name, current_expected_tag)
+        return _handle_incorrect_scan(db, player_id, player_name, current_expected_tag)
 
     # --- SUCCESS: Correct tag was scanned ---
     clue_data = CLUES.get(tag_id)
@@ -441,6 +449,7 @@ def check_clue(tag_id):
     # Determine which clue to display on the success page.
     display_clue = ""
 
+    still_hunting = None
     if next_tag_id:
         # Update progress to the next tag
         db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = DATETIME('now') WHERE player_id = ?", (next_tag_id, player_id))
@@ -451,6 +460,11 @@ def check_clue(tag_id):
         completion_time, player_rank = _handle_final_scan(db, player_id)
         # On the final screen, we can re-display the final clue text.
         display_clue = clue_text(tag_id)
+        # How many explorers are still out there hunting?
+        still_hunting = db.execute(
+            "SELECT COUNT(*) FROM players WHERE end_time IS NULL AND start_time IS NOT NULL AND player_id != ?",
+            (player_id,)
+        ).fetchone()[0]
 
     db.commit()
 
@@ -460,6 +474,8 @@ def check_clue(tag_id):
                            player_name=player_name,
                            completion_time=completion_time,
                            player_rank=player_rank,
+                           wrong_scans=player_row['wrong_scans'],
+                           still_hunting=still_hunting,
                            elapsed_seconds=_elapsed_seconds(player_row['start_time']))
 
 @app.route('/leaderboard')
@@ -545,6 +561,7 @@ def admin_dashboard():
             start_time,
             end_time,
             last_scan_time,
+            wrong_scans,
             (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
         FROM players
         {where_clause}
@@ -717,6 +734,24 @@ def admin_clues():
         tag = CLUES[tag].get('next_tag')
 
     return render_template('admin_clues.html', clues=CLUES, ordered_tags=ordered_tags)
+
+@app.route('/admin/tags')
+def admin_tags():
+    """Printable QR codes per tag — a fallback for unreadable/broken NFC tags."""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_dashboard'))
+
+    tags = []
+    tag = INITIAL_TAG
+    while tag is not None:
+        url = url_for('check_clue', tag_id=tag, _external=True)
+        img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, box_size=8)
+        buf = io.BytesIO()
+        img.save(buf)
+        tags.append({'tag': tag, 'url': url, 'svg': buf.getvalue().decode()})
+        tag = CLUES[tag].get('next_tag')
+
+    return render_template('admin_tags.html', tags=tags)
 
 @app.route('/admin/stats')
 def admin_stats():

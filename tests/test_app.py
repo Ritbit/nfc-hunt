@@ -360,6 +360,51 @@ def test_clue_file_reload_on_mtime_change(client, tmp_path, monkeypatch):
         app_module.CLUES = orig_clues
 
 
+# --- Game extras ---
+
+def test_wrong_scans_counted(client):
+    register(client)
+    client.get('/start')
+    client.get(f'/hunt/clue/{FINAL_TAG}')   # wrong
+    client.get(f'/hunt/clue/{FINAL_TAG}')   # wrong again
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        assert db.execute('SELECT wrong_scans FROM players').fetchone()[0] == 2
+
+
+def test_finish_shows_still_hunting(client):
+    register(client, 'Speedy')
+    with app_module.app.test_client() as c2:
+        c2.post('/', data={'player_name': 'Slowpoke'})
+        c2.get('/start')
+    for tag in TAGS:
+        r = client.get(f'/hunt/clue/{tag}')
+    assert b'still' in r.data  # '1 explorer still out there hunting!'
+
+
+def test_leaderboard_shows_medal(client):
+    register(client)
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    assert '🥇' in client.get('/leaderboard').data.decode()
+
+
+# --- Admin QR tags ---
+
+def test_admin_tags_requires_login(client):
+    r = client.get('/admin/tags')
+    assert r.status_code == 302 and 'dashboard' in r.headers['Location']
+
+
+def test_admin_tags_lists_all_tags(client):
+    admin_login(client)
+    r = client.get('/admin/tags')
+    assert r.status_code == 200
+    for tag in TAGS:
+        assert tag.encode() in r.data
+    assert b'<svg' in r.data
+
+
 # --- Admin clue editor ---
 
 def test_admin_clues_requires_login(client):

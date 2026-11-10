@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Tag QR Codes - Admin{% endblock %}
+
+{% block head_styles %}
+<style>
+    .admin-container { max-width: 90%; }
+    .hint { font-size: 0.9em; color: #666; }
+    .tag-grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 20px; }
+    .tag-card {
+        border: 2px solid #00bcd4; border-radius: 10px; padding: 15px;
+        text-align: center; background: #e0f7fa; width: 220px;
+        break-inside: avoid;
+    }
+    .tag-card svg { width: 180px; height: 180px; }
+    .tag-card .tag-name { font-weight: bold; color: #005662; margin-top: 8px; }
+    .tag-card .tag-url { font-size: 0.7em; word-break: break-all; color: #555; }
+    a.back-link { display: inline-block; margin-top: 15px; color: #1c4587; }
+    @media print { .lang-toggle, .back-link, .hint { display: none; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container admin-container">
+    <h1>🏷️ Tag QR Codes 🏷️</h1>
+    <p class="hint">Print these as a fallback for broken or unreadable NFC tags.
+    Scanning a QR code opens the same URL the NFC tag encodes.</p>
+
+    <div class="tag-grid">
+        {% for t in tags %}
+        <div class="tag-card">
+            {{ t.svg|safe }}
+            <div class="tag-name">{{ loop.index }}. {{ t.tag }}</div>
+            <div class="tag-url">{{ t.url }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <a class="back-link" href="{{ url_for('admin_dashboard') }}">&larr; Back to dashboard</a>
+</div>
+{% endblock %}

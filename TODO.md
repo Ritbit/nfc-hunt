@@ -21,6 +21,27 @@
 - [x] **Admin dashboard**: `last_scan_time` column added (spot stalled players), sortable columns (name/start/last scan/duration), status filter (all/active/finished).
 - [x] **Countdown/timer display**: live elapsed-time counter on `start_game`, `resume_game`, and `clue_display` via shared `templates/_timer.html`.
 
+## Feature ideas (brainstorm)
+
+Cheap wins:
+- [x] **Wrong-tag counter**: `wrong_scans` column (migrated), incremented on each bad scan, shown on finish screen + admin dashboard.
+- [x] **Celebration feedback**: confetti + `navigator.vibrate` on `clue_display` (bigger burst on the final tag); shake + vibrate on the error page.
+- [x] **QR fallback**: `/admin/tags` renders printable SVG QR codes per tag (print-friendly CSS), linked from the dashboard.
+- [x] **Podium medals**: 🥇🥈🥉 replace #1–#3 on the leaderboard.
+- [x] **Players still hunting**: finish screen shows "N explorers still out there hunting!".
+
+Medium:
+- [ ] **Teams**: `team_name` on players, team leaderboard (best/avg time).
+- [ ] **Hint system**: optional `hint:` field per clue, "stuck?" button reveals it (+time penalty).
+- [ ] **Live admin feed**: auto-refreshing recent scan events.
+- [ ] **Countdown race mode**: fixed time limit, score = clues found.
+- [ ] **Randomized clue order per player**: shuffled chain stored per player, kills tag-queuing.
+
+Bigger:
+- [ ] **Photo finish**: selfie upload at final tag, hall-of-fame gallery.
+- [ ] **Websocket leaderboard**: Flask-SocketIO is already installed; push updates instead of polling.
+- [ ] **CSV export**: players/times download from admin.
+
 ## Longer-term extensions
 
 - [x] **Automated tests** (pytest): `tests/test_app.py` — 21 tests covering registration, profanity/duplicate names, sequential traversal, scan-first start, out-of-order rejection, rescans, admin auth, CSRF, pagination clamp, and DB reset. Run: `pytest tests/`.

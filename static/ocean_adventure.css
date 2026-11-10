@@ -346,3 +346,8 @@ a:hover {
 }
 .lang-toggle a { text-decoration: none; opacity: 0.5; padding: 0 4px; }
 .lang-toggle a.active { opacity: 1; }
+
+/* Confetti animation for successful scans */
+@keyframes confetti-fall {
+    to { transform: translateY(105vh) rotate(720deg); opacity: 0.3; }
+}

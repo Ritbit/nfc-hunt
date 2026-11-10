@@ -33,6 +33,13 @@
             {% if player_rank %}
             <p class="rank-display">That puts you at rank <strong>#{{ player_rank }}</strong> on the leaderboard!</p>
             {% endif %}
+
+            {% if wrong_scans %}
+            <p class="wrong-scans">🐟 Wrong tags scanned along the way: <strong>{{ wrong_scans }}</strong></p>
+            {% endif %}
+            {% if still_hunting is not none %}
+            <p class="still-hunting">🌊 {{ still_hunting }} explorer{{ 's' if still_hunting != 1 }} still {{ 'is' if still_hunting == 1 else 'are' }} out there hunting!</p>
+            {% endif %}
         {% endif %}
 
         <p>
@@ -45,6 +52,26 @@
 {% endblock %}
 
 {% block scripts %}
+<script>
+    // Celebration: buzz + confetti on every correct scan (longer on the finish)
+    if (navigator.vibrate) navigator.vibrate({{ '[200,100,200,100,400]' if final else '[120]' }});
+    (function confetti() {
+        const colors = ['#00bcd4', '#ffeb3b', '#ff6f61', '#7cb342', '#1c4587'];
+        const n = {{ 80 if final else 30 }};
+        for (let i = 0; i < n; i++) {
+            const c = document.createElement('div');
+            c.className = 'confetti-piece';
+            c.style.cssText = `position:fixed;top:-10px;left:${Math.random()*100}vw;` +
+                `width:${6+Math.random()*8}px;height:${8+Math.random()*8}px;` +
+                `background:${colors[i % colors.length]};z-index:9999;pointer-events:none;` +
+                `border-radius:${Math.random() > 0.5 ? '50%' : '2px'};` +
+                `transform:rotate(${Math.random()*360}deg);` +
+                `animation:confetti-fall ${1.5+Math.random()*2}s ${Math.random()*0.8}s ease-in forwards;`;
+            document.body.appendChild(c);
+            setTimeout(() => c.remove(), 5000);
+        }
+    })();
+</script>
 <script>
         // Progressive Enhancement for Web NFC
         document.addEventListener('DOMContentLoaded', () => {

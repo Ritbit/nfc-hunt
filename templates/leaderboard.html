@@ -43,7 +43,7 @@
         <table class="leaderboard-table">
             <tr><th>Rank</th><th class="player-name">Explorer</th><th>Time</th></tr>
             {% for player in leaderboard %}
-            <tr><td class="rank">#{{ loop.index }}</td><td class="player-name">{{ player.name }}</td><td class="time">{{ player.time }}</td></tr>
+            <tr><td class="rank">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}</td><td class="player-name">{{ player.name }}</td><td class="time">{{ player.time }}</td></tr>
             {% else %}
             <tr><td colspan="3">No ocean explorers have completed the voyage yet!</td></tr>
             {% endfor %}
