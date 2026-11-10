@@ -2,7 +2,6 @@ Flask
 PyYAML
 python-dateutil
 better-profanity
-profanity-wordlists
 qrcode
 Flask-SocketIO
 simple-websocket

@@ -4,12 +4,13 @@ After=network.target
 
 [Service]
 RuntimeDirectory=uwsgi
-RuntimeDirectoryMode=0755
-User=ec2-user
+RuntimeDirectoryMode=0770
+User=root
 Group=nginx
 WorkingDirectory=/var/www/nfc_hunt
-Environment="PATH=/usr/bin"
-ExecStart=/usr/bin/uwsgi --ini /etc/uwsgi.d/nfc_hunt.ini
+EnvironmentFile=/etc/nfc_hunt.env
+ExecStart=/usr/local/bin/uwsgi --ini /etc/uwsgi.d/nfc_hunt.ini
+Restart=always
 
 [Install]
 WantedBy=multi-user.target
