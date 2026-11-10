@@ -74,6 +74,14 @@ all tags without cycles. Clues can also be edited via `/admin/clues`.
 
 ## 4. Verification & Testing Checklist
 
+Before every commit:
+
+1. Run the test suite: `pytest tests/` (all tests must pass).
+2. Run CodeRabbit on the changes: `coderabbit review --agent` and fix or
+   explicitly dismiss each finding before committing.
+
+When testing changes locally or on server:
+
 When testing changes locally or on server:
 1. **Fresh Player Flow:**
    ```bash

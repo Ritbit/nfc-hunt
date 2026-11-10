@@ -55,17 +55,6 @@ Follow these instructions to get the application running on your own server.
     ```
 
 3.  **Install the required Python packages:**
-    A `requirements.txt` file is recommended. If you don't have one, create it with the following content:
-    ```
-    # requirements.txt
-    Flask
-    PyYAML
-    python-dateutil
-    better-profanity
-    profanity-wordlists
-    gunicorn  # For production
-    ```
-    Then install the dependencies:
     ```bash
     pip install -r requirements.txt
     ```
@@ -102,7 +91,6 @@ The app will be available at `http://<your-local-ip>:5000`.
 
 ### Clues
 
-Modify `clues.yaml` to change the clues, add new steps, or alter the sequence of the hunt. The `next_tag` for the final clue should be `null`.
 Modify `clues.yaml` to change the clues, add new steps, or alter the sequence of the hunt. The final clue in the sequence is identified by having `next_tag: null`.
 
 ### Admin Access

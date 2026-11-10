@@ -42,7 +42,7 @@
             <p class="hints-used">💡 Hints used: <strong>{{ hints_used }}</strong></p>
             {% endif %}
             {% if still_hunting is not none %}
-            <p class="still-hunting">🌊 {{ still_hunting }} explorer{{ 's' if still_hunting != 1 }} still {{ 'is' if still_hunting == 1 else 'are' }} out there hunting!</p>
+            <p class="still-hunting">🌊 {{ still_hunting }} explorer{{ 's' if still_hunting != 1 }} {{ 'is' if still_hunting == 1 else 'are' }} still out there hunting!</p>
             {% endif %}
         {% endif %}
 

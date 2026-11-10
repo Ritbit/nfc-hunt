@@ -258,7 +258,9 @@ app.jinja_env.globals['csrf_token'] = get_csrf_token
 def _csrf_valid():
     """Checks that the submitted form carries the session's CSRF token."""
     token = session.get('csrf_token')
-    return bool(token) and secrets.compare_digest(token, request.form.get('csrf_token', ''))
+    # compare_digest on str raises TypeError for non-ASCII input — compare bytes
+    return bool(token) and secrets.compare_digest(
+        token.encode('utf-8'), request.form.get('csrf_token', '').encode('utf-8'))
 
 # --- Rate Limiting ---
 # Simple in-process limiter. Note: uWSGI runs multiple workers, so limits
@@ -580,7 +582,8 @@ def admin_dashboard():
         if not _csrf_valid():
             flash("Invalid or expired form token. Please try again.", "error")
             return render_template('admin_dashboard.html', admin_logged_in=False)
-        if secrets.compare_digest(request.form.get('password', ''), ADMIN_PASSWORD):
+        if secrets.compare_digest(request.form.get('password', '').encode('utf-8'),
+                                  ADMIN_PASSWORD.encode('utf-8')):
             session['admin_logged_in'] = True
             flash("Login successful!", "info")
             return redirect(url_for('admin_dashboard'))
@@ -714,7 +717,7 @@ def admin_adjust_time(player_id):
         return "Invalid CSRF token", 403
 
     db = get_db()
-    player = db.execute("SELECT player_id, start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player = db.execute("SELECT player_id, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player:
         flash("Player not found.", "error")
         return redirect(url_for('admin_dashboard'))
@@ -730,6 +733,13 @@ def admin_adjust_time(player_id):
     effective_start = new_start if new_start is not None else player['start_time']
     if new_end is not None and effective_start is None:
         flash("Cannot set an end time for a player whose timer has not started.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    # An end before the start yields a negative duration that corrupts rankings.
+    # Covers both a new end_time and an existing end_time vs a moved start_time.
+    effective_end = None if request.form.get('clear_end_time') else (new_end or player['end_time'])
+    if effective_end is not None and effective_start is not None and effective_end < effective_start:
+        flash("End time cannot be earlier than start time.", "error")
         return redirect(url_for('admin_dashboard'))
 
     updates, params = [], []
@@ -829,6 +839,13 @@ def admin_clues():
 
     return render_template('admin_clues.html', clues=CLUES, ordered_tags=ordered_tags)
 
+def _csv_safe(value):
+    """Prefixes a leading single quote on values that spreadsheet apps would
+    interpret as formulas (CSV injection)."""
+    if isinstance(value, str) and value[:1] in ('=', '+', '-', '@', '\t', '\r'):
+        return "'" + value
+    return value
+
 @app.route('/admin/export.csv')
 def admin_export():
     """Downloads all player data as CSV for post-event reporting."""
@@ -850,7 +867,7 @@ def admin_export():
                      'duration_seconds', 'last_scan_time', 'wrong_scans', 'hints_used'])
     for r in rows:
         writer.writerow([
-            r['player_name'], r['team_name'], r['current_clue_tag'],
+            _csv_safe(r['player_name']), _csv_safe(r['team_name']), r['current_clue_tag'],
             r['start_time'], r['end_time'],
             round(r['duration'], 1) if r['duration'] is not None else '',
             r['last_scan_time'], r['wrong_scans'], r['hints_used'],

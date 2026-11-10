@@ -70,11 +70,15 @@
     setInterval(async () => {
         try {
             const html = await (await fetch(window.location.href)).text();
-            const newTable = new DOMParser().parseFromString(html, 'text/html')
-                .querySelector('.leaderboard-table');
-            if (newTable) {
-                document.querySelector('.leaderboard-table').innerHTML = newTable.innerHTML;
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const fresh = doc.querySelectorAll('.leaderboard-table');
+            const current = document.querySelectorAll('.leaderboard-table');
+            if (fresh.length !== current.length) {
+                // A table appeared or disappeared (e.g. first team finished) — full reload
+                window.location.reload();
+                return;
             }
+            current.forEach((t, i) => { t.innerHTML = fresh[i].innerHTML; });
         } catch (e) { /* keep the stale table on transient errors */ }
     }, 30000);
 </script>

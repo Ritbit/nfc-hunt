@@ -115,6 +115,7 @@
             <a href="{{ url_for('admin_dashboard', status='finished', sort=current_sort) }}" {% if current_status == 'finished' %}class="active-filter"{% endif %}>Finished</a>
         </p>
 
+        <div style="overflow-x: auto;">
         <table class="admin-table">
             <thead>
                 <tr>
@@ -173,6 +174,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         {% if total_pages > 1 %}
         <div class="pagination">
@@ -189,6 +191,7 @@
         {% endif %}
 
         <h2>Recent Scans</h2>
+        <div style="overflow-x: auto;">
         <table class="admin-table scan-feed" id="scanFeed">
             <thead><tr><th>Player</th><th>Tag</th><th>Time</th><th>Result</th></tr></thead>
             <tbody>
@@ -204,6 +207,7 @@
                 {% endfor %}
             </tbody>
         </table>
+        </div>
 
         <form class="reset-form" method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('Are you absolutely sure you want to reset the entire game? All player data will be permanently deleted.');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
