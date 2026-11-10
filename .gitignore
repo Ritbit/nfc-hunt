@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.mypy_cache/
+treasure_hunt.db
+*.tgz
+venv/
+.env

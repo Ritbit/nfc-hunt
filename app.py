@@ -7,6 +7,7 @@ from dateutil import parser # Used to parse timestamps from SQLite
 from better_profanity import profanity
 from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch list
 from reset_db import reset_database # Import the reset function
+import math
 # --- Flask Configuration ---
 app = Flask(__name__)
 
@@ -14,6 +15,13 @@ import os
 # --- Security Best Practice: Load Secret Key from Environment Variable ---
 # In your terminal, run: export FLASK_SECRET_KEY='a_very_strong_and_random_secret'
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default_dev_key_is_not_secure')
+
+# --- Security Best Practice: Load Admin Password from Environment Variable ---
+# In your terminal, run: export ADMIN_PASSWORD='your_secure_password'
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+if not ADMIN_PASSWORD:
+    print("WARNING: ADMIN_PASSWORD environment variable not set. Using a default, insecure password 'bruinvis' for development.")
+    ADMIN_PASSWORD = 'bruinvis'
 
 # --- Database Configuration ---
 # Get the absolute path to the directory where this script is located
@@ -66,13 +74,42 @@ def load_clues():
     """Loads clues from the clues.yaml file."""
     try:
         with open('clues.yaml', 'r') as f:
-            return yaml.safe_load(f)
+            clues = yaml.safe_load(f)
     except FileNotFoundError:
         raise RuntimeError("FATAL: clues.yaml not found. The game cannot start.")
     except yaml.YAMLError as e:
         raise RuntimeError(f"FATAL: Error parsing clues.yaml: {e}")
+    return clues
+
+def validate_clues(clues):
+    """Validates the clue chain at startup: every next_tag must resolve,
+    exactly one tag must be the entry point, and the chain must be a
+    single non-cyclic path covering all tags."""
+    if not clues:
+        raise RuntimeError("FATAL: clues.yaml is empty. The game cannot start.")
+    for tag_id, data in clues.items():
+        next_tag = data.get('next_tag')
+        if next_tag is not None and next_tag not in clues:
+            raise RuntimeError(f"FATAL: clue '{tag_id}' points to unknown tag '{next_tag}'.")
+    referenced = {c['next_tag'] for c in clues.values() if c.get('next_tag')}
+    starts = [t for t in clues if t not in referenced]
+    finals = [t for t, c in clues.items() if c.get('next_tag') is None]
+    if len(starts) != 1 or len(finals) != 1:
+        raise RuntimeError(
+            f"FATAL: clue chain must have exactly one start tag and one final tag "
+            f"(found starts={starts}, finals={finals}).")
+    # Walk the chain from the start tag; it must visit every tag exactly once.
+    seen, tag = set(), starts[0]
+    while tag is not None:
+        if tag in seen:
+            raise RuntimeError(f"FATAL: cycle detected in clue chain at '{tag}'.")
+        seen.add(tag)
+        tag = clues[tag].get('next_tag')
+    if seen != set(clues):
+        raise RuntimeError(f"FATAL: clue chain does not cover all tags (missing: {set(clues) - seen}).")
 
 CLUES = load_clues()
+validate_clues(CLUES)
 
 # --- Profanity Filter Configuration ---
 # Replace the default English list with our custom Dutch wordlist.
@@ -123,7 +160,7 @@ def index():
         db = get_db()
         # 2. Check if a player with this name already exists (active or finished)
         existing_player = db.execute(
-            "SELECT player_id FROM players WHERE player_name = ?",
+            "SELECT player_id FROM players WHERE player_name = ? COLLATE NOCASE",
             (clean_player_name,)
         ).fetchone()
 
@@ -157,11 +194,17 @@ def start_game():
     db = get_db()
     player = db.execute("SELECT start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
 
+    if not player:
+        # Stale session: the player was removed from the DB (e.g. by an admin).
+        session.clear()
+        flash("Your registration could not be found. Please register again.", "error")
+        return redirect(url_for('index'))
+
     # If the player exists and their timer hasn't started yet, start it now.
     # This is idempotent, so reloading the page won't reset the timer.
     if player and player['start_time'] is None:
         db.execute(
-            "UPDATE players SET start_time = CURRENT_TIMESTAMP, current_clue_tag = ? WHERE player_id = ?",
+            "UPDATE players SET start_time = DATETIME('now'), current_clue_tag = ? WHERE player_id = ?",
             (INITIAL_TAG, player_id)
         )
         db.commit()
@@ -211,7 +254,7 @@ def _handle_incorrect_scan(player_name, current_expected_tag):
 
 def _handle_final_scan(db, player_id):
     """Handles the logic for the final, game-winning scan."""
-    db.execute("UPDATE players SET current_clue_tag = 'FINISHED', end_time = CURRENT_TIMESTAMP, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (player_id,))
+    db.execute("UPDATE players SET current_clue_tag = 'FINISHED', end_time = DATETIME('now'), last_scan_time = DATETIME('now') WHERE player_id = ?", (player_id,))
     db.commit()
 
     final_times = db.execute("SELECT start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
@@ -245,8 +288,6 @@ def check_clue(tag_id):
         flash("You have already completed the hunt! Here are the results.", "info")
         return redirect(url_for('leaderboard'))
 
-    # Re-fetch player data to get the current expected tag
-    player_row = db.execute("SELECT current_clue_tag FROM players WHERE player_id = ?", (player_id,)).fetchone()
     current_expected_tag = player_row['current_clue_tag']
 
     # Validate the scanned tag
@@ -261,18 +302,25 @@ def check_clue(tag_id):
     next_tag_id = clue_data['next_tag']
     completion_time, player_rank = None, None
 
+    # Determine which clue to display on the success page.
+    display_clue = ""
+
     if next_tag_id:
         # Update progress to the next tag
-        db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = CURRENT_TIMESTAMP WHERE player_id = ?", (next_tag_id, player_id))
+        db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = DATETIME('now') WHERE player_id = ?", (next_tag_id, player_id))
+        # The clue to display is the one for the NEXT tag the player needs to find.
+        display_clue = CLUES[next_tag_id]['clue']
     else:
         # This is the final tag, end the game
         completion_time, player_rank = _handle_final_scan(db, player_id)
+        # On the final screen, we can re-display the final clue text.
+        display_clue = clue_data['clue']
 
     db.commit()
 
     return render_template('clue_display.html',
-                           clue=clue_data['clue'],
-                           final=clue_data['final'],
+                           clue=display_clue,
+                           final=(next_tag_id is None),
                            player_name=player_name,
                            completion_time=completion_time,
                            player_rank=player_rank)
@@ -300,8 +348,6 @@ def leaderboard():
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
 def admin_dashboard():
     """A password-protected dashboard to view all player data."""
-    ADMIN_PASSWORD = "bruinvis"
-
     if request.method == 'POST':
         if request.form.get('password') == ADMIN_PASSWORD:
             session['admin_logged_in'] = True
@@ -313,10 +359,25 @@ def admin_dashboard():
     if not session.get('admin_logged_in'):
         return render_template('admin_dashboard.html', admin_logged_in=False)
 
-    # If logged in, show the dashboard
+    # --- Pagination Logic ---
+    PER_PAGE = 15 # Number of players to show per page
+
     db = get_db()
-    all_players = db.execute('''
+
+    # Get the total number of players for pagination controls
+    total_players_row = db.execute('SELECT COUNT(player_id) FROM players').fetchone()
+    total_players = total_players_row[0]
+    total_pages = math.ceil(total_players / PER_PAGE)
+
+    # Clamp the requested page to the available range
+    page = request.args.get('page', 1, type=int)
+    page = max(1, min(page, total_pages)) if total_pages else 1
+    offset = (page - 1) * PER_PAGE
+
+    # Fetch only the players for the current page
+    players_on_page = db.execute(f'''
         SELECT 
+            player_id,
             player_name, 
             current_clue_tag, 
             start_time, 
@@ -324,9 +385,15 @@ def admin_dashboard():
             (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
         FROM players 
         ORDER BY start_time DESC
+        LIMIT {PER_PAGE} OFFSET {offset}
     ''').fetchall()
 
-    return render_template('admin_dashboard.html', players=all_players, format_duration=_format_duration, admin_logged_in=True)
+    return render_template('admin_dashboard.html', 
+                           players=players_on_page, 
+                           format_duration=_format_duration, 
+                           admin_logged_in=True,
+                           current_page=page,
+                           total_pages=total_pages)
 
 @app.route('/admin/reset', methods=['POST'])
 def admin_reset():
@@ -372,7 +439,7 @@ def admin_change_name(player_id):
 
     db = get_db()
     # Optional: Check if the new name is already taken by another player
-    existing = db.execute("SELECT player_id FROM players WHERE player_name = ? AND player_id != ?", (new_name, player_id)).fetchone()
+    existing = db.execute("SELECT player_id FROM players WHERE player_name = ? COLLATE NOCASE AND player_id != ?", (new_name, player_id)).fetchone()
     if existing:
         flash(f"The name '{new_name}' is already in use by another player.", "error")
         return redirect(url_for('admin_dashboard'))

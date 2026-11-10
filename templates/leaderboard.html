@@ -51,3 +51,20 @@
         <a href="{{ url_for('index') }}">Back to the surface</a>
     </div>
 {% endblock %}
+
+{% block scripts %}
+<script>
+    // Refresh the leaderboard table in place every 30 seconds without
+    // reloading the page, so scroll position and focus are preserved.
+    setInterval(async () => {
+        try {
+            const html = await (await fetch(window.location.href)).text();
+            const newTable = new DOMParser().parseFromString(html, 'text/html')
+                .querySelector('.leaderboard-table');
+            if (newTable) {
+                document.querySelector('.leaderboard-table').innerHTML = newTable.innerHTML;
+            }
+        } catch (e) { /* keep the stale table on transient errors */ }
+    }, 30000);
+</script>
+{% endblock %}

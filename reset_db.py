@@ -1,7 +1,6 @@
 #!/bin/env python3
 import os
 import sqlite3
-from pwd import getpwnam
 
 # --- Configuration ---
 # This script assumes it's in the same directory as app.py and the database.
@@ -36,9 +35,10 @@ def reset_database():
     ''')
     conn.commit()
     conn.close()
-    uid = getpwnam('adyen').pw_uid
-    gid = getpwnam('nginx').pw_gid
-    os.chown(DATABASE,uid,gid)
+
+    # Note: File ownership (chown) has been removed from this script.
+    # Permissions should be managed by the deployment process or the user running the server.
+    # For example, after running this script, you might run: `chown adyen:nginx treasure_hunt.db`
     print("Database has been reset successfully.")
 
 if __name__ == '__main__':

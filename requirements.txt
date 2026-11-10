@@ -1,0 +1,6 @@
+Flask
+PyYAML
+python-dateutil
+better-profanity
+profanity-wordlists
+gunicorn  # For production

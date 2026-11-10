@@ -2,28 +2,23 @@ nfc-mirror:
   next_tag: nfc-ADAM
   clue: "There’s a magic mirror on this floor. If you push its button, you’ll immortalize this moment. You may also find a target near its place. Good luck!\n\n
   Er is een magische spiegel op deze verdieping. Als je op de knop drukt, kun je dit moment vereeuwigen. Je kunt er dichtbij ook een target vinden. Succes!"
-  final: false
 
 nfc-ADAM:
   next_tag: nfc-fishspeak
   clue: "The clown fish likes to watch the A’DAM tower across the river. Find it, it is guarding your next target.\n\n
   De clown vis kijkt graag uit over het water naar de A’DAM toren. Vind deze vis, hij bewaakt je volgende target."
-  final: false
 
 nfc-fishspeak:
   next_tag: nfc-phishing
-  clue: "What does the fish say? Try if they understand fish-speak at the fruit stand on this floor (or just tell them your favorite fish!), and they will give you your next target.\n\n
-  Wat zegt een vis? Probeer of ze vissentaal spreken bij de fruit kraam op deze verdieping (of vertel ze wat je lievelingsvis is!), en je krijgt je volgende target."
-  final: false
+  clue: "The turtle is racing against his friend the hare. They're so distracted that they didn't see there's a fish tag in the room too!\n\n
+  De schildpad doet een race tegen zijn vriendje haas. Ze zijn zo druk bezig dat ze niet hebben gezien dat er ook een fish target is in de kamer!" 
 
 nfc-phishing:
   next_tag: nfc-ballpool
-  clue: "Under the stairs the fish are swimming in a kiddie pool. Find a fish that won’t phish you, and scan its message!\n\n
-  Onder de trap zwemmen visjes in een badje. Vind een vis die je niet phisht, en scan zijn boodschap."
-  final: false
+  clue: "Under the stairs to the 9th floor the fish are swimming in a kiddie pool. Find a fish that won’t phish you, and scan its message!\n\n
+  Onder de trap naar de 9e verdieping zwemmen visjes in een badje. Vind een vis die je niet phisht, en scan zijn boodschap."
 
 nfc-ballpool:
   next_tag: null
   clue: "Dive one floor down into the pool full of balls, and find the fish that has your target.\n\n
   Duik een verdieping naar beneden in het bad vol ballen, en vind de vis die je volgende target heeft."
-  final: true
