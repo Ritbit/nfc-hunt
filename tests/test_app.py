@@ -123,6 +123,9 @@ def test_full_sequential_traversal(client):
         assert r.status_code == 200
         if i < len(TAGS) - 1:
             assert b'Incorrect tag' not in r.data
+            next_clue = app_module.CLUES[TAGS[i + 1]]['clue']
+            expected = next_clue['en'] if isinstance(next_clue, dict) else next_clue
+            assert expected[:30].encode() in r.data
     assert b'minutes and' in r.data
 
 
@@ -267,3 +270,92 @@ def test_resume_page_shows_elapsed_timer(client):
     client.get('/start')
     r = client.get('/resume')
     assert b'elapsedTimer' in r.data
+
+
+# --- i18n ---
+
+def test_language_toggle_serves_dutch_clue(client):
+    register(client)
+    client.get('/lang/nl')
+    r = client.get('/start')
+    dutch = app_module.CLUES[FIRST_TAG]['clue']['nl']
+    assert dutch[:30].encode() in r.data
+
+
+def test_default_language_is_english(client):
+    register(client)
+    r = client.get('/start')
+    english = app_module.CLUES[FIRST_TAG]['clue']['en']
+    assert english[:30].encode() in r.data
+
+
+def test_registration_language_select(client):
+    client.post('/', data={'player_name': 'Tulpen', 'language': 'nl'})
+    with client.session_transaction() as s:
+        assert s['lang'] == 'nl'
+
+
+def test_invalid_language_ignored(client):
+    client.get('/lang/klingon')
+    with client.session_transaction() as s:
+        assert s.get('lang') != 'klingon'
+
+
+# --- Admin clue editor ---
+
+def test_admin_clues_requires_login(client):
+    r = client.get('/admin/clues')
+    assert r.status_code == 302 and 'dashboard' in r.headers['Location']
+
+
+def test_admin_clues_saves_valid_chain(client, tmp_path, monkeypatch):
+    # Point the clues file at a throwaway copy so the real clues.yaml is untouched
+    import yaml
+    orig_clues = dict(app_module.CLUES)
+    tmp_clues = tmp_path / 'clues.yaml'
+    tmp_clues.write_text(yaml.safe_dump(orig_clues, allow_unicode=True))
+    monkeypatch.setattr(app_module, 'CLUES_FILE', str(tmp_clues))
+
+    admin_login(client)
+    data = {'csrf_token': csrf_token(client)}
+    for tag in TAGS:
+        data[f'next_tag[{tag}]'] = app_module.CLUES[tag]['next_tag'] or ''
+        data[f'clue_en[{tag}]'] = 'edited en'
+        data[f'clue_nl[{tag}]'] = 'edited nl'
+    r = client.post('/admin/clues', data=data, follow_redirects=True)
+    assert b'Clues updated' in r.data
+    assert app_module.CLUES[FIRST_TAG]['clue']['en'] == 'edited en'
+    app_module.CLUES = orig_clues  # restore module state for other tests
+
+
+def test_admin_clues_rejects_broken_chain(client):
+    admin_login(client)
+    data = {'csrf_token': csrf_token(client)}
+    for tag in TAGS:
+        data[f'next_tag[{tag}]'] = 'nonexistent-tag'
+        data[f'clue_en[{tag}]'] = 'x'
+        data[f'clue_nl[{tag}]'] = 'x'
+    r = client.post('/admin/clues', data=data, follow_redirects=True)
+    assert b'FATAL' in r.data
+
+
+def test_admin_clues_post_requires_csrf(client):
+    admin_login(client)
+    assert client.post('/admin/clues', data={}).status_code == 403
+
+
+# --- Admin stats ---
+
+def test_admin_stats_requires_login(client):
+    r = client.get('/admin/stats')
+    assert r.status_code == 302 and 'dashboard' in r.headers['Location']
+
+
+def test_admin_stats_renders(client):
+    register(client, 'StatPlayer')
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    admin_login(client)
+    r = client.get('/admin/stats')
+    assert r.status_code == 200
+    assert b'Game Statistics' in r.data and b'Average Time' in r.data

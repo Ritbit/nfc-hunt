@@ -101,6 +101,10 @@
         </form>
     {% else %}
         <p>Welcome, Admin! Here is the current status of all explorers.</p>
+        <p>
+            <a href="{{ url_for('admin_stats') }}">📊 Stats</a> &middot;
+            <a href="{{ url_for('admin_clues') }}">🧩 Edit clues</a>
+        </p>
 
         <p class="status-filter">
             Show:

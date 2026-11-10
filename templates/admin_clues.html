@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Clues - Admin{% endblock %}
+
+{% block head_styles %}
+<style>
+    .admin-container { max-width: 90%; }
+    fieldset { border: 2px solid #00bcd4; border-radius: 8px; margin-bottom: 15px; padding: 15px; text-align: left; }
+    legend { font-weight: bold; color: #005662; padding: 0 8px; }
+    label { display: block; margin: 8px 0 2px; font-weight: bold; font-size: 0.9em; }
+    input[type="text"], textarea { width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    textarea { font-family: inherit; }
+    .save-button { background-color: #2e7d32; color: white; padding: 12px 30px; border: none; border-radius: 8px; font-size: 1.1em; cursor: pointer; margin-top: 10px; }
+    .save-button:hover { opacity: 0.85; }
+    .hint { font-size: 0.85em; color: #666; font-style: italic; }
+    a.back-link { display: inline-block; margin-top: 15px; color: #1c4587; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container admin-container">
+    <h1>🧩 Edit Hunt Clues 🧩</h1>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <p class="hint">Tags are shown in hunt order. The chain is validated on save —
+    it must start at exactly one tag and end at exactly one tag (<code>next tag</code> empty).</p>
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        {% for tag_id in ordered_tags %}
+        {% set clue = clues[tag_id].clue %}
+        <fieldset>
+            <legend>{{ loop.index }}. {{ tag_id }}</legend>
+            <label for="next-{{ tag_id }}">Next tag (leave empty for the final tag)</label>
+            <input type="text" id="next-{{ tag_id }}" name="next_tag[{{ tag_id }}]" value="{{ clues[tag_id].next_tag or '' }}">
+            <label for="en-{{ tag_id }}">Clue (English)</label>
+            <textarea id="en-{{ tag_id }}" name="clue_en[{{ tag_id }}]" rows="3">{{ clue.en if clue is mapping else clue }}</textarea>
+            <label for="nl-{{ tag_id }}">Clue (Dutch)</label>
+            <textarea id="nl-{{ tag_id }}" name="clue_nl[{{ tag_id }}]" rows="3">{{ clue.nl if clue is mapping else '' }}</textarea>
+        </fieldset>
+        {% endfor %}
+
+        <fieldset>
+            <legend>➕ Add a new tag</legend>
+            <p class="hint">Fill these in to append a tag. For it to be reachable, set another tag's
+            <em>next tag</em> to point here — otherwise validation will reject the save.</p>
+            <label for="new-tag">Tag ID</label>
+            <input type="text" id="new-tag" name="new_tag_id" placeholder="e.g. nfc-secret">
+            <label for="new-next">Next tag</label>
+            <input type="text" id="new-next" name="new_next_tag">
+            <label for="new-en">Clue (English)</label>
+            <textarea id="new-en" name="new_clue_en" rows="2"></textarea>
+            <label for="new-nl">Clue (Dutch)</label>
+            <textarea id="new-nl" name="new_clue_nl" rows="2"></textarea>
+        </fieldset>
+
+        <button type="submit" class="save-button">Save clues</button>
+    </form>
+
+    <a class="back-link" href="{{ url_for('admin_dashboard') }}">&larr; Back to dashboard</a>
+</div>
+{% endblock %}

@@ -26,9 +26,15 @@ Every entry in the clue configuration must adhere to this schema:
 ```yaml
 tag_id:
   next_tag: next_tag_id_or_null
-  clue: "Human readable clue string"
+  clue:
+    en: "English clue text"    # required
+    nl: "Dutch clue text"      # optional
 ```
+`clue` may also be a plain string (legacy format); localized dicts are preferred.
 The final clue is identified by `next_tag: null` — there is no separate `final` flag.
+The chain is validated at startup: every `next_tag` must resolve, exactly one
+unreferenced start tag and one final tag must exist, and the chain must cover
+all tags without cycles. Clues can also be edited via `/admin/clues`.
 
 ### HTML & Templates (`templates/`)
 - Mobile-first, responsive layouts: All templates must look clean on portrait smartphone screens (360px–430px wide).

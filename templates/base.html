@@ -30,6 +30,11 @@
     {# The main content block to be filled by child templates #}
     {% block content %}{% endblock %}
 
+    <div class="lang-toggle">
+        <a href="{{ url_for('set_language', lang='en') }}" {% if session.get('lang', 'en') == 'en' %}class="active"{% endif %}>🇬🇧</a>
+        <a href="{{ url_for('set_language', lang='nl') }}" {% if session.get('lang') == 'nl' %}class="active"{% endif %}>🇳🇱</a>
+    </div>
+
     {# A block for page-specific scripts #}
     {% block scripts %}{% endblock %}
 </body>

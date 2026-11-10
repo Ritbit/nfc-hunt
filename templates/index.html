@@ -28,6 +28,11 @@
             <form method="post">
                 <input type="text" name="player_name" placeholder="Your Explorer Name" required>
                 <br>
+                <select name="language" class="lang-select">
+                    <option value="en" {% if session.get('lang', 'en') == 'en' %}selected{% endif %}>🇬🇧 English</option>
+                    <option value="nl" {% if session.get('lang') == 'nl' %}selected{% endif %}>🇳🇱 Nederlands</option>
+                </select>
+                <br>
                 <input type="submit" value="Start Adventure!">
             </form>
         </div>

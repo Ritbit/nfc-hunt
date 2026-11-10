@@ -9,6 +9,7 @@ from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch l
 from reset_db import reset_database # Import the reset function
 import math
 import secrets
+import shutil
 import time
 from collections import defaultdict
 # --- Flask Configuration ---
@@ -30,6 +31,7 @@ if not ADMIN_PASSWORD:
 # Get the absolute path to the directory where this script is located
 basedir = os.path.abspath(os.path.dirname(__file__))
 DATABASE = os.environ.get('DATABASE', os.path.join(basedir, 'treasure_hunt.db'))
+CLUES_FILE = os.path.join(basedir, 'clues.yaml')
 
 def get_db():
     """Connects to the database, creating one connection per request."""
@@ -88,7 +90,7 @@ init_db()
 def load_clues():
     """Loads clues from the clues.yaml file."""
     try:
-        with open('clues.yaml', 'r') as f:
+        with open(CLUES_FILE, 'r') as f:
             clues = yaml.safe_load(f)
     except FileNotFoundError:
         raise RuntimeError("FATAL: clues.yaml not found. The game cannot start.")
@@ -103,6 +105,11 @@ def validate_clues(clues):
     if not clues:
         raise RuntimeError("FATAL: clues.yaml is empty. The game cannot start.")
     for tag_id, data in clues.items():
+        clue = data.get('clue')
+        if not clue:
+            raise RuntimeError(f"FATAL: clue '{tag_id}' has no clue text.")
+        if isinstance(clue, dict) and 'en' not in clue:
+            raise RuntimeError(f"FATAL: clue '{tag_id}' is missing required 'en' clue text.")
         next_tag = data.get('next_tag')
         if next_tag is not None and next_tag not in clues:
             raise RuntimeError(f"FATAL: clue '{tag_id}' points to unknown tag '{next_tag}'.")
@@ -122,16 +129,33 @@ def validate_clues(clues):
         tag = clues[tag].get('next_tag')
     if seen != set(clues):
         raise RuntimeError(f"FATAL: clue chain does not cover all tags (missing: {set(clues) - seen}).")
+    return starts[0]
 
 CLUES = load_clues()
-validate_clues(CLUES)
+INITIAL_TAG = validate_clues(CLUES) # Returns the chain's entry-point tag
 
 # --- Profanity Filter Configuration ---
 # Replace the default English list with our custom Dutch wordlist.
 profanity.load_censor_words(DUTCH_PROFANITY_LIST)
 
 # --- Helper Functions & Dynamic Configuration ---
-INITIAL_TAG = next(iter(CLUES)) # Dynamically get the first tag from the clues file
+SUPPORTED_LANGUAGES = ('en', 'nl')
+
+def clue_text(tag_id):
+    """Returns the clue text for a tag in the player's session language.
+    Supports both plain-string clues and localized {en: ..., nl: ...} dicts."""
+    clue = CLUES[tag_id].get('clue')
+    if isinstance(clue, dict):
+        lang = session.get('lang', 'en')
+        return clue.get(lang) or clue.get('en') or next(iter(clue.values()))
+    return clue
+
+@app.route('/lang/<lang>')
+def set_language(lang):
+    """Stores the player's language preference and returns to the page they came from."""
+    if lang in SUPPORTED_LANGUAGES:
+        session['lang'] = lang
+    return redirect(request.referrer or url_for('index'))
 
 def _format_duration(total_seconds):
     """Helper function to format seconds into a 'minutes and seconds' string."""
@@ -238,6 +262,9 @@ def index():
 
         session['player_id'] = player_id
         session['player_name'] = clean_player_name
+        lang = request.form.get('language')
+        if lang in SUPPORTED_LANGUAGES:
+            session['lang'] = lang
         session.permanent = True  # Make the session cookie more durable
 
         # Redirect to the new start page instead of directly to the clue check
@@ -275,7 +302,7 @@ def start_game():
 
     return render_template('start_game.html',
                            player_name=player_name,
-                           first_clue=CLUES[INITIAL_TAG]['clue'],
+                           first_clue=clue_text(INITIAL_TAG),
                            elapsed_seconds=_elapsed_seconds(player['start_time']))
 
 @app.route('/resume')
@@ -295,7 +322,7 @@ def resume_game():
 
     # The player's current clue is the one for the tag they are looking for.
     current_clue_tag = player['current_clue_tag'] or INITIAL_TAG
-    current_clue_text = CLUES[current_clue_tag]['clue']
+    current_clue_text = clue_text(current_clue_tag)
     return render_template('resume_game.html',
                            player_name=player['player_name'],
                            current_clue=current_clue_text,
@@ -316,7 +343,7 @@ def _handle_incorrect_scan(player_name, current_expected_tag):
     """Generates the response for scanning the wrong tag."""
     current_clue_info = CLUES.get(current_expected_tag)
     if current_clue_info:
-        error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{current_clue_info['clue']}\""
+        error_message = f"Incorrect tag scanned. You are currently looking for the tag associated with the clue: \n\n\"{clue_text(current_expected_tag)}\""
     else:
         error_message = "Incorrect tag scanned. Please check your current clue."
     return render_template('error.html', message=error_message, player_name=player_name)
@@ -391,12 +418,12 @@ def check_clue(tag_id):
         # Update progress to the next tag
         db.execute("UPDATE players SET current_clue_tag = ?, last_scan_time = DATETIME('now') WHERE player_id = ?", (next_tag_id, player_id))
         # The clue to display is the one for the NEXT tag the player needs to find.
-        display_clue = CLUES[next_tag_id]['clue']
+        display_clue = clue_text(next_tag_id)
     else:
         # This is the final tag, end the game
         completion_time, player_rank = _handle_final_scan(db, player_id)
         # On the final screen, we can re-display the final clue text.
-        display_clue = clue_data['clue']
+        display_clue = clue_text(tag_id)
 
     db.commit()
 
@@ -590,6 +617,114 @@ def admin_adjust_time(player_id):
     db.commit()
     flash("Player times updated.", "info")
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/clues', methods=['GET', 'POST'])
+def admin_clues():
+    """Lets an admin edit clues.yaml from the dashboard, with validation."""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_dashboard'))
+
+    global CLUES, INITIAL_TAG
+
+    if request.method == 'POST':
+        if not _csrf_valid():
+            return "Invalid CSRF token", 403
+
+        # Rebuild the clue mapping from the form fields
+        new_clues = {}
+        for tag_id in CLUES:
+            next_tag = request.form.get(f'next_tag[{tag_id}]', '').strip() or None
+            new_clues[tag_id] = {
+                'next_tag': next_tag,
+                'clue': {
+                    'en': request.form.get(f'clue_en[{tag_id}]', '').strip(),
+                    'nl': request.form.get(f'clue_nl[{tag_id}]', '').strip(),
+                },
+            }
+
+        # Optionally append a new tag (only usable if some next_tag points to it)
+        new_tag_id = request.form.get('new_tag_id', '').strip()
+        if new_tag_id:
+            if new_tag_id in new_clues:
+                flash(f"Tag '{new_tag_id}' already exists.", "error")
+                return redirect(url_for('admin_clues'))
+            new_clues[new_tag_id] = {
+                'next_tag': request.form.get('new_next_tag', '').strip() or None,
+                'clue': {
+                    'en': request.form.get('new_clue_en', '').strip(),
+                    'nl': request.form.get('new_clue_nl', '').strip(),
+                },
+            }
+
+        try:
+            new_initial = validate_clues(new_clues)
+        except RuntimeError as e:
+            flash(str(e), "error")
+            return redirect(url_for('admin_clues'))
+
+        # Back up the old file before overwriting
+        shutil.copy(CLUES_FILE, CLUES_FILE + '.bak')
+        with open(CLUES_FILE, 'w') as f:
+            yaml.safe_dump(new_clues, f, sort_keys=False, allow_unicode=True)
+
+        CLUES, INITIAL_TAG = new_clues, new_initial
+        flash("Clues updated successfully. A backup was saved to clues.yaml.bak", "info")
+        return redirect(url_for('admin_clues'))
+
+    # Walk the chain to display tags in hunt order
+    ordered_tags, tag = [], INITIAL_TAG
+    while tag is not None:
+        ordered_tags.append(tag)
+        tag = CLUES[tag].get('next_tag')
+
+    return render_template('admin_clues.html', clues=CLUES, ordered_tags=ordered_tags)
+
+@app.route('/admin/stats')
+def admin_stats():
+    """Aggregated game statistics for the admin."""
+    if not session.get('admin_logged_in'):
+        return redirect(url_for('admin_dashboard'))
+
+    db = get_db()
+    totals = db.execute('''
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN end_time IS NOT NULL THEN 1 ELSE 0 END) AS finished,
+               SUM(CASE WHEN end_time IS NULL AND start_time IS NOT NULL THEN 1 ELSE 0 END) AS active,
+               SUM(CASE WHEN start_time IS NULL THEN 1 ELSE 0 END) AS not_started
+        FROM players
+    ''').fetchone()
+
+    durations = db.execute('''
+        SELECT AVG(d) AS avg_d, MIN(d) AS min_d, MAX(d) AS max_d FROM (
+            SELECT (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS d
+            FROM players WHERE end_time IS NOT NULL
+        )
+    ''').fetchone()
+
+    # Players currently stuck at each stage (or not started yet)
+    stalled_rows = db.execute('''
+        SELECT current_clue_tag, COUNT(*) AS n FROM players
+        WHERE end_time IS NULL
+        GROUP BY current_clue_tag
+    ''').fetchall()
+    stalled = {r['current_clue_tag'] or 'NOT_STARTED': r['n'] for r in stalled_rows}
+
+    # Build per-stage funnel in hunt order
+    stages = [{'tag': 'NOT_STARTED', 'clue': 'Registered, timer not started'}]
+    tag = INITIAL_TAG
+    while tag is not None:
+        clue = CLUES[tag].get('clue')
+        snippet = clue.get('en', '')[:60] if isinstance(clue, dict) else str(clue)[:60]
+        stages.append({'tag': tag, 'clue': snippet})
+        tag = CLUES[tag].get('next_tag')
+    for s in stages:
+        s['count'] = stalled.get(s['tag'], 0)
+
+    return render_template('admin_stats.html',
+                           totals=totals,
+                           durations=durations,
+                           stages=stages,
+                           format_duration=_format_duration)
 
 @app.route('/admin/change_name/<player_id>', methods=['POST'])
 def admin_change_name(player_id):

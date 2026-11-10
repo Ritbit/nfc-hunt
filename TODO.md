@@ -24,9 +24,11 @@
 ## Longer-term extensions
 
 - [x] **Automated tests** (pytest): `tests/test_app.py` — 21 tests covering registration, profanity/duplicate names, sequential traversal, scan-first start, out-of-order rejection, rescans, admin auth, CSRF, pagination clamp, and DB reset. Run: `pytest tests/`.
-- [ ] **Multiple hunts / configurable entry tag**: support parallel hunts or team vs solo modes.
-- [ ] **Admin clue editor**: fill in `admin_clues.html` — edit `clues.yaml` from the dashboard with validation.
-- [ ] **i18n toggle**: clues are already bilingual (EN/NL) — let players pick a language instead of showing both.
-- [ ] **Stats panel**: average completion time, drop-off per clue, scan timestamps chart.
+- [ ] **Multiple hunts / configurable entry tag** (deferred — decide scope first):
+  - Option A: multiple clue sets, admin picks which single hunt is active.
+  - Option B: parallel hunts chosen at registration, `hunt_id` on players + per-hunt leaderboards.
+- [x] **Admin clue editor**: `/admin/clues` — edit `next_tag` + EN/NL clue text per tag, add new tags; chain validated before save, backup written to `clues.yaml.bak`.
+- [x] **i18n toggle**: `clues.yaml` uses `{en, nl}` clue maps (plain strings still supported); language select at registration + global 🇬🇧/🇳🇱 toggle via `/lang/<lang>`.
+- [x] **Stats panel**: `/admin/stats` — registered/active/finished counts, avg/min/max completion time, per-stage player distribution with bars.
 - [x] **Deployment artifacts**: uWSGI ini, nginx conf, and systemd unit now versioned in `deploy/` (from CONTEXT.md).
 - [x] **Time adjustment in admin**: `/admin/adjust_time/<player_id>` — set start/end times via datetime pickers or clear `end_time` to reopen a game. CSRF-protected.

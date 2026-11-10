@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Game Stats - Admin{% endblock %}
+
+{% block head_styles %}
+<style>
+    .admin-container { max-width: 90%; }
+    .stat-cards { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; margin: 20px 0; }
+    .stat-card {
+        background: #e0f7fa; border: 2px solid #00bcd4; border-radius: 10px;
+        padding: 15px 25px; min-width: 140px; text-align: center;
+    }
+    .stat-card .value { font-size: 2em; font-weight: bold; color: #005662; }
+    .stat-card .label { font-size: 0.9em; color: #333; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; border: 2px solid #455a64; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 10px; border-bottom: 1px solid #cfd8dc; text-align: left; }
+    th { background-color: #37474f; color: white; }
+    .bar-cell { width: 40%; }
+    .bar { background-color: #1976d2; height: 18px; border-radius: 3px; min-width: 2px; }
+    a.back-link { display: inline-block; margin-top: 15px; color: #1c4587; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container admin-container">
+    <h1>📊 Game Statistics 📊</h1>
+
+    <div class="stat-cards">
+        <div class="stat-card"><div class="value">{{ totals.total or 0 }}</div><div class="label">Registered</div></div>
+        <div class="stat-card"><div class="value">{{ totals.active or 0 }}</div><div class="label">In Progress</div></div>
+        <div class="stat-card"><div class="value">{{ totals.finished or 0 }}</div><div class="label">Finished</div></div>
+        <div class="stat-card"><div class="value">{{ totals.not_started or 0 }}</div><div class="label">Not Started</div></div>
+    </div>
+
+    {% if durations.avg_d is not none %}
+    <div class="stat-cards">
+        <div class="stat-card"><div class="value">{{ format_duration(durations.avg_d) }}</div><div class="label">Average Time</div></div>
+        <div class="stat-card"><div class="value">{{ format_duration(durations.min_d) }}</div><div class="label">Fastest</div></div>
+        <div class="stat-card"><div class="value">{{ format_duration(durations.max_d) }}</div><div class="label">Slowest</div></div>
+    </div>
+    {% endif %}
+
+    <h2>Where players are now</h2>
+    <table>
+        <thead><tr><th>Stage</th><th>Clue</th><th>Players</th><th class="bar-cell"></th></tr></thead>
+        <tbody>
+            {% for stage in stages %}
+            <tr>
+                <td>{{ stage.tag }}</td>
+                <td>{{ stage.clue }}{% if stage.clue %}…{% endif %}</td>
+                <td>{{ stage.count }}</td>
+                <td class="bar-cell">
+                    {% if stage.count and totals.total %}
+                    <div class="bar" style="width: {{ (stage.count / totals.total * 100)|round(1) }}%"></div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <a class="back-link" href="{{ url_for('admin_dashboard') }}">&larr; Back to dashboard</a>
+</div>
+{% endblock %}
