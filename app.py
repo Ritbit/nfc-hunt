@@ -1060,6 +1060,23 @@ def internal_error(e):
     return _render_http_error(500, "🦑", "A kraken attacked the ship!",
                               "Something went wrong on our end. The crew has been notified.")
 
+@app.errorhandler(Exception)
+def catch_all_errors(e):
+    """Fallback: any unhandled HTTPException (501/503/505, etc.) gets the themed page."""
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException):
+        code = e.code
+        title = e.name
+    else:
+        code = 500
+        title = "A kraken attacked the ship!"
+        app.logger.exception("Unhandled exception: %s", e)
+    emoji = "🦑" if code >= 500 else "🧭"
+    message = ("Something went wrong on our end. The crew has been notified."
+               if code >= 500 else
+               "That request hit a reef. Try heading back to the surface.")
+    return _render_http_error(code, emoji, title, message)
+
 if __name__ == '__main__':
     # For testing, run with: python3 app.py
     # For production, use Gunicorn/Nginx as described previously
