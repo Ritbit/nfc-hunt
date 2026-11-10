@@ -33,6 +33,10 @@ def reset_database():
             end_time DATETIME
         )
     ''')
+    conn.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_players_name '
+        'ON players(player_name COLLATE NOCASE)'
+    )
     conn.commit()
     conn.close()
 

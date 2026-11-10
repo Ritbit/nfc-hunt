@@ -13,17 +13,17 @@
 ## Short-term improvements
 
 - [x] **`requirements.txt`** — README told users to create it; now shipped.
-- [ ] **Scan-first entry point**: AGENTS.md says a player may start by scanning `nfc-mirror`, but a scan before `/start` is rejected (`current_clue_tag` is NULL). Let a valid first-tag scan start the timer.
+- [x] **Scan-first entry point**: scanning `nfc-mirror` as a registered player (before `/start`) now starts the timer and advances to the second clue.
 - [x] **Reconciled clue schema docs**: AGENTS.md documented a `final:` flag the code ignores — docs updated; "final" is derived from `next_tag: null`.
-- [ ] **CSRF protection on admin POST routes** (`/admin/reset`, `/admin/remove_player`, `/admin/change_name`): add a session token check or Flask-WTF.
-- [ ] **Rate limit registration and admin login** to slow down name-squatting / password brute force.
-- [ ] **Server-side uniqueness constraint** on `player_name COLLATE NOCASE` — currently only enforced by a check-then-insert race.
+- [x] **CSRF protection on admin POST routes** (`/admin/reset`, `/admin/remove_player`, `/admin/change_name`, login): session token checked on every POST.
+- [x] **Rate limit registration and admin login**: 10 registrations/min and 10 login attempts/5min per IP, in-process (note: uWSGI workers multiply effective limits).
+- [x] **Server-side uniqueness constraint** on `player_name COLLATE NOCASE` — unique index created in `init_db`/`reset_db.py`; `IntegrityError` handled at insert and rename.
 - [ ] **Admin dashboard**: show `last_scan_time` (detect stalled players), sort/filter by progress, link player rows.
 - [ ] **Countdown/timer display** on `start_game`/`resume_game`/`clue_display` so players see elapsed time.
 
 ## Longer-term extensions
 
-- [ ] **Automated tests** (pytest): sequential traversal, out-of-order rejection, finished-player rescans, name validation, admin auth.
+- [x] **Automated tests** (pytest): `tests/test_app.py` — 21 tests covering registration, profanity/duplicate names, sequential traversal, scan-first start, out-of-order rejection, rescans, admin auth, CSRF, pagination clamp, and DB reset. Run: `pytest tests/`.
 - [ ] **Multiple hunts / configurable entry tag**: support parallel hunts or team vs solo modes.
 - [ ] **Admin clue editor**: fill in `admin_clues.html` — edit `clues.yaml` from the dashboard with validation.
 - [ ] **i18n toggle**: clues are already bilingual (EN/NL) — let players pick a language instead of showing both.

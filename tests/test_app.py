@@ -1,0 +1,205 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+os.environ.setdefault('ADMIN_PASSWORD', 'test-admin-password')
+
+import pytest
+
+import app as app_module
+import reset_db as reset_db_module
+
+TAGS = list(app_module.CLUES)          # ordered tag chain
+FIRST_TAG = TAGS[0]
+FINAL_TAG = TAGS[-1]
+ADMIN_PW = os.environ['ADMIN_PASSWORD']
+
+
+@pytest.fixture()
+def client(tmp_path, monkeypatch):
+    """A test client backed by a fresh, isolated SQLite database."""
+    db_path = str(tmp_path / 'test.db')
+    monkeypatch.setattr(app_module, 'DATABASE', db_path)
+    monkeypatch.setattr(reset_db_module, 'DATABASE', db_path)
+    app_module.init_db()
+    app_module._attempts.clear()       # reset rate limiter between tests
+    app_module.app.config['TESTING'] = True
+    with app_module.app.test_client() as c:
+        yield c
+
+
+def register(client, name='Explorer'):
+    return client.post('/', data={'player_name': name})
+
+
+def csrf_token(client):
+    """Render the admin login page (which issues a token) and read it back."""
+    client.get('/admin/dashboard')
+    with client.session_transaction() as s:
+        return s['csrf_token']
+
+
+def admin_login(client):
+    token = csrf_token(client)
+    return client.post('/admin/dashboard',
+                       data={'password': ADMIN_PW, 'csrf_token': token},
+                       follow_redirects=True)
+
+
+# --- Registration ---
+
+def test_index_renders(client):
+    assert client.get('/').status_code == 200
+
+
+def test_register_redirects_to_start(client):
+    r = register(client)
+    assert r.status_code == 302 and '/start' in r.headers['Location']
+
+
+def test_register_rejects_empty_name(client):
+    r = client.post('/', data={'player_name': '   '}, follow_redirects=True)
+    assert b'cannot be empty' in r.data
+
+
+def test_register_rejects_profanity(client):
+    r = client.post('/', data={'player_name': 'klootzak'}, follow_redirects=True)
+    assert b'inappropriate language' in r.data
+
+
+def test_register_rejects_duplicate_name_case_insensitive(client):
+    register(client, 'Skipper')
+    with client.session_transaction():
+        pass  # ensure first registration is committed
+    # New client simulates a second browser registering the same name
+    with app_module.app.test_client() as c2:
+        r = c2.post('/', data={'player_name': 'skipper'}, follow_redirects=True)
+        assert b'already on a voyage' in r.data
+
+
+# --- Game progression ---
+
+def test_start_sets_timer_once(client):
+    register(client)
+    client.get('/start')
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        row = db.execute("SELECT start_time, current_clue_tag FROM players").fetchone()
+        assert row['start_time'] is not None
+        assert row['current_clue_tag'] == FIRST_TAG
+
+
+def test_scan_first_tag_starts_game(client):
+    """Scanning the first NFC tag without visiting /start starts the timer."""
+    register(client)
+    r = client.get(f'/hunt/clue/{FIRST_TAG}')
+    assert r.status_code == 200
+    assert b'Incorrect tag' not in r.data
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        row = db.execute("SELECT start_time, current_clue_tag FROM players").fetchone()
+        assert row['start_time'] is not None
+        assert row['current_clue_tag'] == TAGS[1]
+
+
+def test_scan_wrong_first_tag_rejected(client):
+    register(client)
+    r = client.get(f'/hunt/clue/{FINAL_TAG}')
+    assert b'Incorrect tag' in r.data
+
+
+def test_out_of_order_scan_rejected(client):
+    register(client)
+    client.get('/start')
+    r = client.get(f'/hunt/clue/{FINAL_TAG}')
+    assert b'Incorrect tag' in r.data
+
+
+def test_full_sequential_traversal(client):
+    register(client)
+    client.get('/start')
+    for i, tag in enumerate(TAGS):
+        r = client.get(f'/hunt/clue/{tag}')
+        assert r.status_code == 200
+        if i < len(TAGS) - 1:
+            assert b'Incorrect tag' not in r.data
+    assert b'minutes and' in r.data
+
+
+def test_rescan_after_finish_redirects_to_leaderboard(client):
+    register(client)
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    r = client.get(f'/hunt/clue/{FIRST_TAG}')
+    assert r.status_code == 302 and '/leaderboard' in r.headers['Location']
+
+
+def test_unregistered_scan_redirects_to_index(client):
+    r = client.get(f'/hunt/clue/{FIRST_TAG}')
+    assert r.status_code == 302
+    with client.session_transaction() as s:
+        assert s.get('player_id') is None
+
+
+def test_leaderboard_lists_finisher(client):
+    register(client, 'Champion')
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    assert b'Champion' in client.get('/leaderboard').data
+
+
+# --- Admin ---
+
+def test_admin_requires_password(client):
+    r = client.get('/admin/dashboard')
+    assert b'enter the password' in r.data.lower()
+
+
+def test_admin_rejects_wrong_password(client):
+    token = csrf_token(client)
+    r = client.post('/admin/dashboard',
+                    data={'password': 'wrong', 'csrf_token': token})
+    assert b'Incorrect password' in r.data
+
+
+def test_admin_login_and_player_listed(client):
+    register(client, 'VisiblePlayer')
+    admin_login(client)
+    r = client.get('/admin/dashboard')
+    assert b'VisiblePlayer' in r.data
+
+
+def test_admin_dashboard_clamps_page(client):
+    admin_login(client)
+    assert client.get('/admin/dashboard?page=999').status_code == 200
+    assert client.get('/admin/dashboard?page=-3').status_code == 200
+
+
+def test_admin_reset_requires_csrf(client):
+    admin_login(client)
+    assert client.post('/admin/reset').status_code == 403
+
+
+def test_admin_reset_with_csrf(client):
+    register(client, 'ToBeWiped')
+    admin_login(client)
+    with client.session_transaction() as s:
+        token = s['csrf_token']
+    r = client.post('/admin/reset', data={'csrf_token': token}, follow_redirects=True)
+    assert r.status_code == 200
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        assert db.execute('SELECT COUNT(*) FROM players').fetchone()[0] == 0
+
+
+def test_admin_remove_player_requires_csrf(client):
+    register(client)
+    admin_login(client)
+    assert client.post('/admin/remove_player/whatever').status_code == 403
+
+
+def test_admin_rename_requires_csrf(client):
+    register(client)
+    admin_login(client)
+    r = client.post('/admin/change_name/whatever', data={'new_name': 'X'})
+    assert r.status_code == 403
