@@ -31,7 +31,18 @@ def reset_database():
             last_scan_time DATETIME,
             start_time DATETIME,
             end_time DATETIME,
-            wrong_scans INTEGER NOT NULL DEFAULT 0
+            wrong_scans INTEGER NOT NULL DEFAULT 0,
+            hints_used INTEGER NOT NULL DEFAULT 0,
+            team_name TEXT NOT NULL DEFAULT ''
+        )
+    ''')
+    conn.execute('''
+        CREATE TABLE scans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id TEXT NOT NULL,
+            tag_id TEXT NOT NULL,
+            scan_time DATETIME,
+            correct INTEGER NOT NULL DEFAULT 1
         )
     ''')
     conn.execute(

@@ -216,10 +216,11 @@ def test_admin_status_filter(client):
         c2.post('/', data={'player_name': 'StillPlaying'})
         c2.get('/start')
     admin_login(client)
-    r = client.get('/admin/dashboard?status=finished')
-    assert b'Finisher' in r.data and b'StillPlaying' not in r.data
-    r = client.get('/admin/dashboard?status=active')
-    assert b'StillPlaying' in r.data and b'Finisher' not in r.data
+    # Scope assertions to the player table (the scan feed below it is global)
+    players_table = client.get('/admin/dashboard?status=finished').data.split(b'Recent Scans')[0]
+    assert b'Finisher' in players_table and b'StillPlaying' not in players_table
+    players_table = client.get('/admin/dashboard?status=active').data.split(b'Recent Scans')[0]
+    assert b'StillPlaying' in players_table and b'Finisher' not in players_table
 
 
 def test_admin_sort_param_accepted(client):
@@ -387,6 +388,74 @@ def test_leaderboard_shows_medal(client):
     for tag in TAGS:
         client.get(f'/hunt/clue/{tag}')
     assert '🥇' in client.get('/leaderboard').data.decode()
+
+
+# --- Hints ---
+
+def test_hint_shows_text_and_counts(client):
+    register(client)
+    client.get('/start')
+    r = client.get('/hint')
+    assert r.status_code == 200 and b'hint-text' in r.data
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        assert db.execute('SELECT hints_used FROM players').fetchone()[0] == 1
+
+
+def test_hint_requires_registration(client):
+    r = client.get('/hint')
+    assert r.status_code == 302
+
+
+def test_hints_shown_on_finish(client):
+    register(client)
+    client.get('/hint')
+    for tag in TAGS:
+        r = client.get(f'/hunt/clue/{tag}')
+    assert b'Hints used' in r.data
+
+
+# --- Teams ---
+
+def test_registration_with_team(client):
+    client.post('/', data={'player_name': 'Crew', 'team_name': 'Sharks'})
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        assert db.execute("SELECT team_name FROM players").fetchone()[0] == 'Sharks'
+
+
+def test_leaderboard_shows_teams(client):
+    client.post('/', data={'player_name': 'Crewmate', 'team_name': 'Sharks'})
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    r = client.get('/leaderboard')
+    assert b'Top Teams' in r.data and b'Sharks' in r.data
+
+
+# --- Scan feed & CSV ---
+
+def test_scans_logged(client):
+    register(client)
+    client.get('/start')
+    client.get(f'/hunt/clue/{FIRST_TAG}')
+    client.get(f'/hunt/clue/{FINAL_TAG}')  # wrong
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        rows = db.execute('SELECT correct FROM scans ORDER BY id').fetchall()
+        assert [r[0] for r in rows] == [1, 0]
+
+
+def test_admin_export_csv(client):
+    register(client, 'CsvPlayer')
+    admin_login(client)
+    r = client.get('/admin/export.csv')
+    assert r.status_code == 200
+    assert 'text/csv' in r.content_type
+    assert b'CsvPlayer' in r.data and b'player_name' in r.data
+
+
+def test_admin_export_requires_login(client):
+    assert client.get('/admin/export.csv').status_code == 403
 
 
 # --- Admin QR tags ---

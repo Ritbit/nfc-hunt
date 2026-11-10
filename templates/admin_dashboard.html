@@ -104,7 +104,8 @@
         <p>
             <a href="{{ url_for('admin_stats') }}">📊 Stats</a> &middot;
             <a href="{{ url_for('admin_clues') }}">🧩 Edit clues</a> &middot;
-            <a href="{{ url_for('admin_tags') }}">🏷️ Tag QRs</a>
+            <a href="{{ url_for('admin_tags') }}">🏷️ Tag QRs</a> &middot;
+            <a href="{{ url_for('admin_export') }}">⬇️ Export CSV</a>
         </p>
 
         <p class="status-filter">
@@ -118,11 +119,13 @@
             <thead>
                 <tr>
                     <th><a href="{{ url_for('admin_dashboard', sort='name', status=current_status) }}">Player Name</a></th>
+                    <th>Team</th>
                     <th>Status / Current Clue</th>
                     <th><a href="{{ url_for('admin_dashboard', sort='start', status=current_status) }}">Start Time</a></th>
                     <th>End Time</th>
                     <th><a href="{{ url_for('admin_dashboard', sort='last_scan', status=current_status) }}">Last Scan</a></th>
                     <th>Wrong Scans</th>
+                    <th>Hints</th>
                     <th><a href="{{ url_for('admin_dashboard', sort='duration', status=current_status) }}">Total Duration</a></th>
                     <th>Actions</th>
                 </tr>
@@ -131,6 +134,7 @@
                 {% for player in players %}
                 <tr>
                     <td>{{ player.player_name }}</td>
+                    <td>{{ player.team_name or '—' }}</td>
                     <td>
                         {% if player.current_clue_tag == 'FINISHED' %}
                             <span class="status-finished">Finished</span>
@@ -142,6 +146,7 @@
                     <td>{{ player.end_time or 'N/A' }}</td>
                     <td>{{ player.last_scan_time or 'N/A' }}</td>
                     <td>{{ player.wrong_scans }}</td>
+                    <td>{{ player.hints_used }}</td>
                     <td>{{ format_duration(player.duration) if player.duration else 'N/A' }}</td>
                     <td>
                         <form method="post" action="{{ url_for('admin_change_name', player_id=player.player_id) }}" style="display: inline-block; margin-right: 5px;">
@@ -183,6 +188,23 @@
         </div>
         {% endif %}
 
+        <h2>Recent Scans</h2>
+        <table class="admin-table scan-feed" id="scanFeed">
+            <thead><tr><th>Player</th><th>Tag</th><th>Time</th><th>Result</th></tr></thead>
+            <tbody>
+                {% for scan in recent_scans %}
+                <tr>
+                    <td>{{ scan.player_name }}</td>
+                    <td>{{ scan.tag_id }}</td>
+                    <td>{{ scan.scan_time }}</td>
+                    <td>{{ '✅' if scan.correct else '❌' }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">No scans yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
         <form class="reset-form" method="post" action="{{ url_for('admin_reset') }}" onsubmit="return confirm('Are you absolutely sure you want to reset the entire game? All player data will be permanently deleted.');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <h2>Reset Game Database</h2>
@@ -191,4 +213,19 @@
         </form>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Refresh the scan feed in place every 15 seconds without reloading.
+    setInterval(async () => {
+        try {
+            const html = await (await fetch(window.location.href)).text();
+            const feed = new DOMParser().parseFromString(html, 'text/html').querySelector('#scanFeed');
+            if (feed) {
+                document.querySelector('#scanFeed').innerHTML = feed.innerHTML;
+            }
+        } catch (e) { /* keep stale feed on transient errors */ }
+    }, 15000);
+</script>
 {% endblock %}

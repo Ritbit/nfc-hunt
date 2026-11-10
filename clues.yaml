@@ -3,27 +3,42 @@ nfc-mirror:
   clue:
     en: "There’s a magic mirror on this floor. If you push its button, you’ll immortalize this moment. You may also find a target near its place. Good luck!"
     nl: "Er is een magische spiegel op deze verdieping. Als je op de knop drukt, kun je dit moment vereeuwigen. Je kunt er dichtbij ook een target vinden. Succes!"
+  hint:
+    en: "Look for the photo booth on this floor — the tag is near it."
+    nl: "Zoek de fotospiegel op deze verdieping — het target zit er vlakbij."
 
 nfc-ADAM:
   next_tag: nfc-fishspeak
   clue:
     en: "The clown fish likes to watch the A’DAM tower across the river. Find it, it is guarding your next target."
     nl: "De clown vis kijkt graag uit over het water naar de A’DAM toren. Vind deze vis, hij bewaakt je volgende target."
+  hint:
+    en: "Search the windows facing the river for a small orange-and-white fish."
+    nl: "Zoek bij de ramen aan de waterkant naar een klein oranje-wit visje."
 
 nfc-fishspeak:
   next_tag: nfc-phishing
   clue:
     en: "The turtle is racing against his friend the hare. They're so distracted that they didn't see there's a fish tag in the room too!"
     nl: "De schildpad doet een race tegen zijn vriendje haas. Ze zijn zo druk bezig dat ze niet hebben gezien dat er ook een fish target is in de kamer!"
+  hint:
+    en: "Find the room with the turtle-versus-hare decoration; the tag is inside that same room."
+    nl: "Zoek de ruimte met de schildpad-tegen-haas versiering; het target hangt in diezelfde ruimte."
 
 nfc-phishing:
   next_tag: nfc-ballpool
   clue:
     en: "Under the stairs to the 9th floor the fish are swimming in a kiddie pool. Find a fish that won’t phish you, and scan its message!"
     nl: "Onder de trap naar de 9e verdieping zwemmen visjes in een badje. Vind een vis die je niet phisht, en scan zijn boodschap."
+  hint:
+    en: "Head to the stairwell to the 9th floor and look underneath it for the kiddie pool."
+    nl: "Ga naar het trappenhuis naar de 9e verdieping en kijk eronder naar het kinderbadje."
 
 nfc-ballpool:
   next_tag: null
   clue:
     en: "Dive one floor down into the pool full of balls, and find the fish that has your target."
     nl: "Duik een verdieping naar beneden in het bad vol ballen, en vind de vis die je volgende target heeft."
+  hint:
+    en: "The ball pit is one floor below — dig around inside it for a fish holding a tag."
+    nl: "Het ballenbad is een verdieping lager — graaf erin rond naar een vis met een target."

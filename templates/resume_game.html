@@ -26,6 +26,7 @@
         <div class="clue-text">{{ current_clue }}</div>
         <div id="scan-instructions">
             <p>Figure out the clue, find the fish tag, and scan it to continue your journey!</p>
+            <p><a href="{{ url_for('hint') }}">💡 Stuck? Get a hint</a></p>
             <button id="scanButton" class="scan-button">Scan Tag</button>
             <p id="scanStatus" class="scan-status"></p>
         </div>

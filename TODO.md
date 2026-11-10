@@ -33,9 +33,9 @@ Cheap wins:
 
 Medium:
 
-- [ ] **Teams**: `team_name` on players, team leaderboard (best/avg time).
-- [ ] **Hint system**: optional `hint:` field per clue, "stuck?" button reveals it (+time penalty).
-- [ ] **Live admin feed**: auto-refreshing recent scan events.
+- [x] **Teams**: `team_name` on registration + column; Top Teams table on leaderboard (ranked by fastest finisher); admin column + CSV field.
+- [x] **Hint system**: optional `hint: {en, nl}` per clue (editable in `/admin/clues`); `/hint` route shows it and counts `hints_used`; shown on finish screen.
+- [x] **Live admin feed**: `scans` event table logs every scan (correct/wrong); "Recent Scans" table on dashboard auto-refreshes every 15s in place.
 - [ ] **Countdown race mode**: fixed time limit, score = clues found.
 - [ ] **Randomized clue order per player**: shuffled chain stored per player, kills tag-queuing.
 
@@ -43,7 +43,7 @@ Bigger:
 
 - [ ] **Photo finish**: selfie upload at final tag, hall-of-fame gallery.
 - [ ] **Websocket leaderboard**: Flask-SocketIO is already installed; push updates instead of polling.
-- [ ] **CSV export**: players/times download from admin.
+- [x] **CSV export**: `/admin/export.csv` streams all player data (name, team, times, wrong scans, hints).
 
 ## Longer-term extensions
 

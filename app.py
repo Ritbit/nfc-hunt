@@ -1,4 +1,4 @@
-from flask import Flask, request, redirect, url_for, render_template, session, flash, g
+from flask import Flask, request, redirect, url_for, render_template, session, flash, g, Response
 import uuid
 import sqlite3
 import datetime
@@ -8,6 +8,7 @@ from better_profanity import profanity
 from profanity_wordlists import DUTCH_PROFANITY_LIST # Import our custom Dutch list
 from reset_db import reset_database # Import the reset function
 import math
+import csv
 import io
 import secrets
 import shutil
@@ -74,6 +75,21 @@ def init_db():
             db.execute('ALTER TABLE players ADD COLUMN player_name TEXT NOT NULL DEFAULT "Old Player"')
         if 'wrong_scans' not in columns:
             db.execute('ALTER TABLE players ADD COLUMN wrong_scans INTEGER NOT NULL DEFAULT 0')
+        if 'hints_used' not in columns:
+            db.execute('ALTER TABLE players ADD COLUMN hints_used INTEGER NOT NULL DEFAULT 0')
+        if 'team_name' not in columns:
+            db.execute("ALTER TABLE players ADD COLUMN team_name TEXT NOT NULL DEFAULT ''")
+
+        # Scan event log — powers the live admin feed
+        db.execute('''
+            CREATE TABLE IF NOT EXISTS scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player_id TEXT NOT NULL,
+                tag_id TEXT NOT NULL,
+                scan_time DATETIME,
+                correct INTEGER NOT NULL DEFAULT 1
+            )
+        ''')
 
         # 3. Enforce case-insensitive uniqueness of player names at the DB level,
         #    so concurrent registrations can't slip past the check-then-insert.
@@ -115,6 +131,9 @@ def validate_clues(clues):
             raise RuntimeError(f"FATAL: clue '{tag_id}' has no clue text.")
         if isinstance(clue, dict) and not (clue.get('en') or '').strip():
             raise RuntimeError(f"FATAL: clue '{tag_id}' is missing required 'en' clue text.")
+        hint = data.get('hint')
+        if isinstance(hint, dict) and not (hint.get('en') or '').strip():
+            raise RuntimeError(f"FATAL: hint for '{tag_id}' must include non-empty 'en' text.")
         next_tag = data.get('next_tag')
         if next_tag is not None and next_tag not in clues:
             raise RuntimeError(f"FATAL: clue '{tag_id}' points to unknown tag '{next_tag}'.")
@@ -165,14 +184,42 @@ profanity.load_censor_words(DUTCH_PROFANITY_LIST)
 # --- Helper Functions & Dynamic Configuration ---
 SUPPORTED_LANGUAGES = ('en', 'nl')
 
-def clue_text(tag_id):
-    """Returns the clue text for a tag in the player's session language.
-    Supports both plain-string clues and localized {en: ..., nl: ...} dicts."""
-    clue = CLUES[tag_id].get('clue')
-    if isinstance(clue, dict):
+def clue_field(tag_id, field):
+    """Returns a localized clue field ('clue' or 'hint') for a tag.
+    Supports both plain strings and localized {en: ..., nl: ...} dicts."""
+    data = CLUES.get(tag_id, {}).get(field)
+    if isinstance(data, dict):
         lang = session.get('lang', 'en')
-        return clue.get(lang) or clue.get('en') or next(iter(clue.values()))
-    return clue
+        return data.get(lang) or data.get('en') or next(iter(data.values()))
+    return data
+
+def clue_text(tag_id):
+    """Returns the clue text for a tag in the player's session language."""
+    return clue_field(tag_id, 'clue')
+
+@app.route('/hint')
+def hint():
+    """Reveals the hint for the player's current clue (each view is counted)."""
+    db = get_db()
+    player_id, player_row = _get_player_from_session(db)
+    if not player_id:
+        flash("Please register to start the hunt.", "error")
+        return redirect(url_for('index'))
+    if player_row['end_time']:
+        return redirect(url_for('leaderboard'))
+
+    current_tag = player_row['current_clue_tag'] or INITIAL_TAG
+    hint_text = clue_field(current_tag, 'hint')
+    if not hint_text:
+        flash("Sorry, no hint is available for this clue.", "info")
+        return redirect(url_for('resume_game'))
+
+    db.execute("UPDATE players SET hints_used = hints_used + 1 WHERE player_id = ?", (player_id,))
+    db.commit()
+    return render_template('hint.html',
+                           player_name=player_row['player_name'],
+                           hint=hint_text,
+                           elapsed_seconds=_elapsed_seconds(player_row['start_time']))
 
 @app.route('/lang/<lang>')
 def set_language(lang):
@@ -279,9 +326,11 @@ def index():
         
         # --- End Sanity Checks ---
 
+        team_name = request.form.get('team_name', '').strip()
+
         player_id = str(uuid.uuid4())
         try:
-            db.execute("INSERT INTO players (player_id, player_name) VALUES (?, ?)", (player_id, clean_player_name))
+            db.execute("INSERT INTO players (player_id, player_name, team_name) VALUES (?, ?, ?)", (player_id, clean_player_name, team_name))
             db.commit()
         except sqlite3.IntegrityError:
             # Unique index caught a concurrent duplicate registration
@@ -366,15 +415,17 @@ def _get_player_from_session(db):
     player_id = session.get('player_id')
     if not player_id:
         return None, None
-    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time, wrong_scans FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time, wrong_scans, hints_used FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player_row:
         session.clear()
         return None, None
     return player_id, player_row
 
-def _handle_incorrect_scan(db, player_id, player_name, current_expected_tag):
+def _handle_incorrect_scan(db, player_id, player_name, current_expected_tag, scanned_tag):
     """Generates the response for scanning the wrong tag."""
     db.execute("UPDATE players SET wrong_scans = wrong_scans + 1 WHERE player_id = ?", (player_id,))
+    db.execute("INSERT INTO scans (player_id, tag_id, scan_time, correct) VALUES (?, ?, DATETIME('now'), 0)",
+               (player_id, scanned_tag))
     db.commit()
     current_clue_info = CLUES.get(current_expected_tag)
     if current_clue_info:
@@ -426,7 +477,7 @@ def check_clue(tag_id):
     # treat the scan as a correct first find.
     if current_expected_tag is None:
         if tag_id != INITIAL_TAG:
-            return _handle_incorrect_scan(db, player_id, player_name, INITIAL_TAG)
+            return _handle_incorrect_scan(db, player_id, player_name, INITIAL_TAG, tag_id)
         db.execute(
             "UPDATE players SET start_time = DATETIME('now'), current_clue_tag = ? WHERE player_id = ?",
             (INITIAL_TAG, player_id)
@@ -436,7 +487,7 @@ def check_clue(tag_id):
 
     # Validate the scanned tag
     if tag_id != current_expected_tag:
-        return _handle_incorrect_scan(db, player_id, player_name, current_expected_tag)
+        return _handle_incorrect_scan(db, player_id, player_name, current_expected_tag, tag_id)
 
     # --- SUCCESS: Correct tag was scanned ---
     clue_data = CLUES.get(tag_id)
@@ -448,6 +499,9 @@ def check_clue(tag_id):
 
     # Determine which clue to display on the success page.
     display_clue = ""
+
+    db.execute("INSERT INTO scans (player_id, tag_id, scan_time, correct) VALUES (?, ?, DATETIME('now'), 1)",
+               (player_id, tag_id))
 
     still_hunting = None
     if next_tag_id:
@@ -475,6 +529,7 @@ def check_clue(tag_id):
                            completion_time=completion_time,
                            player_rank=player_rank,
                            wrong_scans=player_row['wrong_scans'],
+                           hints_used=player_row['hints_used'],
                            still_hunting=still_hunting,
                            elapsed_seconds=_elapsed_seconds(player_row['start_time']))
 
@@ -496,7 +551,24 @@ def leaderboard():
     for row in rows:
         minutes, seconds = divmod(int(row['duration']), 60)
         leaderboard_data.append({'name': row['player_name'], 'time': f"{minutes}m {seconds}s"})
-    return render_template('leaderboard.html', leaderboard=leaderboard_data)
+
+    # Top teams: ranked by their fastest finisher
+    team_rows = db.execute('''
+        SELECT team_name,
+               MIN((JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0) AS best_time,
+               COUNT(*) AS finishers
+        FROM players
+        WHERE end_time IS NOT NULL AND team_name != ''
+        GROUP BY team_name COLLATE NOCASE
+        ORDER BY best_time ASC
+        LIMIT 5
+    ''').fetchall()
+    team_data = []
+    for row in team_rows:
+        minutes, seconds = divmod(int(row['best_time']), 60)
+        team_data.append({'name': row['team_name'], 'time': f"{minutes}m {seconds}s", 'finishers': row['finishers']})
+
+    return render_template('leaderboard.html', leaderboard=leaderboard_data, teams=team_data)
 
 @app.route('/admin/dashboard', methods=['GET', 'POST'])
 def admin_dashboard():
@@ -557,11 +629,13 @@ def admin_dashboard():
         SELECT
             player_id,
             player_name,
+            team_name,
             current_clue_tag,
             start_time,
             end_time,
             last_scan_time,
             wrong_scans,
+            hints_used,
             (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
         FROM players
         {where_clause}
@@ -569,7 +643,17 @@ def admin_dashboard():
         LIMIT {PER_PAGE} OFFSET {offset}
     ''').fetchall()
 
+    # Recent scan events for the live feed
+    recent_scans = db.execute('''
+        SELECT s.tag_id, s.scan_time, s.correct, p.player_name
+        FROM scans s
+        JOIN players p ON p.player_id = s.player_id
+        ORDER BY s.id DESC
+        LIMIT 12
+    ''').fetchall()
+
     return render_template('admin_dashboard.html',
+                           recent_scans=recent_scans,
                            players=players_on_page,
                            format_duration=_format_duration,
                            admin_logged_in=True,
@@ -689,13 +773,18 @@ def admin_clues():
         new_clues = {}
         for tag_id in CLUES:
             next_tag = request.form.get(f'next_tag[{tag_id}]', '').strip() or None
-            new_clues[tag_id] = {
+            entry = {
                 'next_tag': next_tag,
                 'clue': {
                     'en': request.form.get(f'clue_en[{tag_id}]', '').strip(),
                     'nl': request.form.get(f'clue_nl[{tag_id}]', '').strip(),
                 },
             }
+            hint_en = request.form.get(f'hint_en[{tag_id}]', '').strip()
+            hint_nl = request.form.get(f'hint_nl[{tag_id}]', '').strip()
+            if hint_en or hint_nl:
+                entry['hint'] = {'en': hint_en, 'nl': hint_nl}
+            new_clues[tag_id] = entry
 
         # Optionally append a new tag (only usable if some next_tag points to it)
         new_tag_id = request.form.get('new_tag_id', '').strip()
@@ -710,6 +799,11 @@ def admin_clues():
                     'nl': request.form.get('new_clue_nl', '').strip(),
                 },
             }
+            if request.form.get('new_hint_en', '').strip() or request.form.get('new_hint_nl', '').strip():
+                new_clues[new_tag_id]['hint'] = {
+                    'en': request.form.get('new_hint_en', '').strip(),
+                    'nl': request.form.get('new_hint_nl', '').strip(),
+                }
 
         try:
             new_initial = validate_clues(new_clues)
@@ -734,6 +828,36 @@ def admin_clues():
         tag = CLUES[tag].get('next_tag')
 
     return render_template('admin_clues.html', clues=CLUES, ordered_tags=ordered_tags)
+
+@app.route('/admin/export.csv')
+def admin_export():
+    """Downloads all player data as CSV for post-event reporting."""
+    if not session.get('admin_logged_in'):
+        return "Unauthorized", 403
+
+    db = get_db()
+    rows = db.execute('''
+        SELECT player_name, team_name, current_clue_tag, start_time, end_time,
+               last_scan_time, wrong_scans, hints_used,
+               (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
+        FROM players
+        ORDER BY start_time
+    ''').fetchall()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['player_name', 'team_name', 'status', 'start_time', 'end_time',
+                     'duration_seconds', 'last_scan_time', 'wrong_scans', 'hints_used'])
+    for r in rows:
+        writer.writerow([
+            r['player_name'], r['team_name'], r['current_clue_tag'],
+            r['start_time'], r['end_time'],
+            round(r['duration'], 1) if r['duration'] is not None else '',
+            r['last_scan_time'], r['wrong_scans'], r['hints_used'],
+        ])
+
+    return Response(output.getvalue(), mimetype='text/csv',
+                    headers={'Content-Disposition': 'attachment; filename=nfc_hunt_players.csv'})
 
 @app.route('/admin/tags')
 def admin_tags():

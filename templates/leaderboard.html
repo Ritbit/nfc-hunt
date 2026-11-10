@@ -48,6 +48,17 @@
             <tr><td colspan="3">No ocean explorers have completed the voyage yet!</td></tr>
             {% endfor %}
         </table>
+
+        {% if teams %}
+        <h1>🐟 Top Teams 🐟</h1>
+        <table class="leaderboard-table teams-table">
+            <tr><th>Rank</th><th class="player-name">Team</th><th>Best Time</th><th>Finishers</th></tr>
+            {% for team in teams %}
+            <tr><td class="rank">{% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}#{{ loop.index }}{% endif %}</td><td class="player-name">{{ team.name }}</td><td class="time">{{ team.time }}</td><td>{{ team.finishers }}</td></tr>
+            {% endfor %}
+        </table>
+        {% endif %}
+
         <a href="{{ url_for('index') }}">Back to the surface</a>
     </div>
 {% endblock %}

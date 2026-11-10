@@ -20,6 +20,7 @@
         <div class="clue-text">{{ clue }}</div>
         <div id="scan-instructions">
             <p class="success-message">Your current objective is to figure out this clue and <b>find the next fish tag</b> to continue your deep sea journey!</p>
+            <p><a href="{{ url_for('hint') }}">💡 Stuck? Get a hint</a></p>
             <button id="scanButton" class="scan-button">Scan Next Clue</button>
             <p id="scanStatus" class="scan-status"></p>
         </div>
@@ -36,6 +37,9 @@
 
             {% if wrong_scans %}
             <p class="wrong-scans">🐟 Wrong tags scanned along the way: <strong>{{ wrong_scans }}</strong></p>
+            {% endif %}
+            {% if hints_used %}
+            <p class="hints-used">💡 Hints used: <strong>{{ hints_used }}</strong></p>
             {% endif %}
             {% if still_hunting is not none %}
             <p class="still-hunting">🌊 {{ still_hunting }} explorer{{ 's' if still_hunting != 1 }} still {{ 'is' if still_hunting == 1 else 'are' }} out there hunting!</p>

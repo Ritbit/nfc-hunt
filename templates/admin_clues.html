@@ -45,6 +45,11 @@
             <textarea id="en-{{ tag_id }}" name="clue_en[{{ tag_id }}]" rows="3">{{ clue.en if clue is mapping else clue }}</textarea>
             <label for="nl-{{ tag_id }}">Clue (Dutch)</label>
             <textarea id="nl-{{ tag_id }}" name="clue_nl[{{ tag_id }}]" rows="3">{{ clue.nl if clue is mapping else '' }}</textarea>
+            {% set hint = clues[tag_id].hint %}
+            <label for="hen-{{ tag_id }}">Hint (English, optional)</label>
+            <textarea id="hen-{{ tag_id }}" name="hint_en[{{ tag_id }}]" rows="2">{{ hint.en if hint is mapping else hint }}</textarea>
+            <label for="hnl-{{ tag_id }}">Hint (Dutch, optional)</label>
+            <textarea id="hnl-{{ tag_id }}" name="hint_nl[{{ tag_id }}]" rows="2">{{ hint.nl if hint is mapping else '' }}</textarea>
         </fieldset>
         {% endfor %}
 

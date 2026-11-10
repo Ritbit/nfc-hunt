@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}A Hint! - Ocean Adventure{% endblock %}
+
+{% block head_styles %}
+<style>
+    .hint-text {
+        font-size: 1.4em; margin: 20px 0; padding: 20px;
+        border: 3px dashed #ff9800; background-color: #fff8e1;
+        border-radius: 10px; white-space: pre-wrap; color: #1c1c1c;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <h1>💡 A Friendly Hint 💡</h1>
+        <p>Explorer: <strong>{{ player_name }}</strong></p>
+        {% include "_timer.html" %}
+        <div class="hint-text">{{ hint }}</div>
+        <p>Now go find that fish tag!</p>
+        <p><a href="{{ url_for('resume_game') }}">Back to your clue</a></p>
+    </div>
+{% endblock %}

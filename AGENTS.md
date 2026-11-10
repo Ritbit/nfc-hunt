@@ -29,7 +29,11 @@ tag_id:
   clue:
     en: "English clue text"    # required
     nl: "Dutch clue text"      # optional
+  hint:
+    en: "Optional English hint"
+    nl: "Optional Dutch hint"
 ```
+`hint` is optional entirely; when present as a dict, `en` must be non-empty.
 `clue` may also be a plain string (legacy format); localized dicts are preferred.
 The final clue is identified by `next_tag: null` — there is no separate `final` flag.
 The chain is validated at startup: every `next_tag` must resolve, exactly one
