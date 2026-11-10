@@ -5,7 +5,7 @@ import sqlite3
 # --- Configuration ---
 # This script assumes it's in the same directory as app.py and the database.
 basedir = os.path.abspath(os.path.dirname(__file__))
-DATABASE = os.path.join(basedir, 'treasure_hunt.db')
+DATABASE = os.environ.get('DATABASE', os.path.join(basedir, 'treasure_hunt.db'))
 
 def reset_database():
     """

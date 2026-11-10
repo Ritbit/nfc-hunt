@@ -24,8 +24,7 @@ app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'default_dev_key_is_not_secu
 # In your terminal, run: export ADMIN_PASSWORD='your_secure_password'
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 if not ADMIN_PASSWORD:
-    print("WARNING: ADMIN_PASSWORD environment variable not set. Using a default, insecure password 'bruinvis' for development.")
-    ADMIN_PASSWORD = 'bruinvis'
+    raise RuntimeError("FATAL: ADMIN_PASSWORD environment variable is not set.")
 
 # --- Database Configuration ---
 # Get the absolute path to the directory where this script is located
@@ -108,7 +107,7 @@ def validate_clues(clues):
         clue = data.get('clue')
         if not clue:
             raise RuntimeError(f"FATAL: clue '{tag_id}' has no clue text.")
-        if isinstance(clue, dict) and 'en' not in clue:
+        if isinstance(clue, dict) and not (clue.get('en') or '').strip():
             raise RuntimeError(f"FATAL: clue '{tag_id}' is missing required 'en' clue text.")
         next_tag = data.get('next_tag')
         if next_tag is not None and next_tag not in clues:
@@ -133,6 +132,25 @@ def validate_clues(clues):
 
 CLUES = load_clues()
 INITIAL_TAG = validate_clues(CLUES) # Returns the chain's entry-point tag
+_clues_mtime = os.path.getmtime(CLUES_FILE)
+
+@app.before_request
+def _refresh_clues():
+    """uWSGI runs several workers; an admin clue edit writes the file but only
+    updates the saving worker's memory. Every worker reloads when the mtime
+    changes, keeping all workers on the same clue chain."""
+    global CLUES, INITIAL_TAG, _clues_mtime
+    try:
+        mtime = os.path.getmtime(CLUES_FILE)
+    except OSError:
+        return
+    if mtime != _clues_mtime:
+        try:
+            new_clues = load_clues()
+            new_initial = validate_clues(new_clues)
+        except RuntimeError:
+            return  # keep serving the last valid chain if the file is broken
+        CLUES, INITIAL_TAG, _clues_mtime = new_clues, new_initial, mtime
 
 # --- Profanity Filter Configuration ---
 # Replace the default English list with our custom Dutch wordlist.
@@ -155,7 +173,12 @@ def set_language(lang):
     """Stores the player's language preference and returns to the page they came from."""
     if lang in SUPPORTED_LANGUAGES:
         session['lang'] = lang
-    return redirect(request.referrer or url_for('index'))
+    # Never redirect back to a /hunt/clue/ URL — it would rescan the tag
+    # (GET mutates progress), producing a bogus "incorrect tag" page.
+    ref = request.referrer
+    if not ref or '/hunt/clue/' in ref:
+        return redirect(url_for('resume_game' if session.get('player_id') else 'index'))
+    return redirect(ref)
 
 def _format_duration(total_seconds):
     """Helper function to format seconds into a 'minutes and seconds' string."""
@@ -314,11 +337,15 @@ def resume_game():
         return redirect(url_for('index'))
 
     db = get_db()
-    player = db.execute("SELECT player_name, current_clue_tag, start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player = db.execute("SELECT player_name, current_clue_tag, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
 
     if not player:
         session.clear()
         return redirect(url_for('index'))
+
+    if player['end_time']:
+        # Finished players have no current clue; 'FINISHED' is not a real tag.
+        return redirect(url_for('leaderboard'))
 
     # The player's current clue is the one for the tag they are looking for.
     current_clue_tag = player['current_clue_tag'] or INITIAL_TAG
@@ -465,7 +492,7 @@ def admin_dashboard():
         if not _csrf_valid():
             flash("Invalid or expired form token. Please try again.", "error")
             return render_template('admin_dashboard.html', admin_logged_in=False)
-        if request.form.get('password') == ADMIN_PASSWORD:
+        if secrets.compare_digest(request.form.get('password', ''), ADMIN_PASSWORD):
             session['admin_logged_in'] = True
             flash("Login successful!", "info")
             return redirect(url_for('admin_dashboard'))
@@ -586,7 +613,7 @@ def admin_adjust_time(player_id):
         return "Invalid CSRF token", 403
 
     db = get_db()
-    player = db.execute("SELECT player_id FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player = db.execute("SELECT player_id, start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player:
         flash("Player not found.", "error")
         return redirect(url_for('admin_dashboard'))
@@ -598,12 +625,23 @@ def admin_adjust_time(player_id):
         flash(str(e), "error")
         return redirect(url_for('admin_dashboard'))
 
+    # An end_time without a start_time makes duration NULL and breaks the leaderboard
+    effective_start = new_start if new_start is not None else player['start_time']
+    if new_end is not None and effective_start is None:
+        flash("Cannot set an end time for a player whose timer has not started.", "error")
+        return redirect(url_for('admin_dashboard'))
+
     updates, params = [], []
     if new_start is not None:
         updates.append("start_time = ?")
         params.append(new_start)
     if request.form.get('clear_end_time'):
         updates.append("end_time = NULL")
+        # Reopened players are still 'FINISHED' in current_clue_tag; point them
+        # back at the final tag so rescanning it completes the game again.
+        final_tag = next(t for t, c in CLUES.items() if c.get('next_tag') is None)
+        updates.append("current_clue_tag = ?")
+        params.append(final_tag)
     elif new_end is not None:
         updates.append("end_time = ?")
         params.append(new_end)
@@ -624,7 +662,7 @@ def admin_clues():
     if not session.get('admin_logged_in'):
         return redirect(url_for('admin_dashboard'))
 
-    global CLUES, INITIAL_TAG
+    global CLUES, INITIAL_TAG, _clues_mtime
 
     if request.method == 'POST':
         if not _csrf_valid():
@@ -668,6 +706,7 @@ def admin_clues():
             yaml.safe_dump(new_clues, f, sort_keys=False, allow_unicode=True)
 
         CLUES, INITIAL_TAG = new_clues, new_initial
+        _clues_mtime = os.path.getmtime(CLUES_FILE)
         flash("Clues updated successfully. A backup was saved to clues.yaml.bak", "info")
         return redirect(url_for('admin_clues'))
 
@@ -714,7 +753,8 @@ def admin_stats():
     tag = INITIAL_TAG
     while tag is not None:
         clue = CLUES[tag].get('clue')
-        snippet = clue.get('en', '')[:60] if isinstance(clue, dict) else str(clue)[:60]
+        full = clue.get('en', '') if isinstance(clue, dict) else str(clue)
+        snippet = full[:60] + '…' if len(full) > 60 else full
         stages.append({'tag': tag, 'clue': snippet})
         tag = CLUES[tag].get('next_tag')
     for s in stages:

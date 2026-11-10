@@ -301,6 +301,65 @@ def test_invalid_language_ignored(client):
         assert s.get('lang') != 'klingon'
 
 
+def test_lang_toggle_does_not_rescan_tag(client):
+    """Toggling language after a scan must not re-hit /hunt/clue/<tag>."""
+    register(client)
+    client.get('/start')
+    scan_url = f'/hunt/clue/{FIRST_TAG}'
+    client.get(scan_url)
+    r = client.get('/lang/nl', headers={'Referer': f'http://localhost{scan_url}'})
+    assert r.status_code == 302 and '/hunt/clue/' not in r.headers['Location']
+
+
+def test_resume_redirects_finished_player(client):
+    """A finished player hitting /resume must not 500 on clue_text('FINISHED')."""
+    register(client)
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    r = client.get('/resume')
+    assert r.status_code == 302 and '/leaderboard' in r.headers['Location']
+
+
+def test_clear_end_time_reopens_game(client):
+    """Clearing end_time must reset current_clue_tag away from 'FINISHED'."""
+    register(client, 'Reopener')
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    admin_login(client)
+    token = csrf_token(client)
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        pid = db.execute("SELECT player_id FROM players WHERE player_name = 'Reopener'").fetchone()['player_id']
+    client.post(f'/admin/adjust_time/{pid}',
+                data={'csrf_token': token, 'clear_end_time': 'on'},
+                follow_redirects=True)
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        row = db.execute("SELECT end_time, current_clue_tag FROM players WHERE player_id = ?", (pid,)).fetchone()
+        assert row['end_time'] is None
+        assert row['current_clue_tag'] == FINAL_TAG
+
+
+def test_clue_file_reload_on_mtime_change(client, tmp_path, monkeypatch):
+    """Workers pick up clue edits by watching the file mtime."""
+    import yaml
+    orig_clues = dict(app_module.CLUES)
+    orig_file = app_module.CLUES_FILE
+    tmp_clues = tmp_path / 'clues.yaml'
+    new_clues = dict(orig_clues)
+    new_clues[FIRST_TAG] = dict(new_clues[FIRST_TAG])
+    new_clues[FIRST_TAG]['clue'] = dict(new_clues[FIRST_TAG]['clue'])
+    new_clues[FIRST_TAG]['clue']['en'] = 'RELOADED-CLUE-XYZ'
+    tmp_clues.write_text(yaml.safe_dump(new_clues, allow_unicode=True))
+    monkeypatch.setattr(app_module, 'CLUES_FILE', str(tmp_clues))
+    try:
+        register(client)
+        r = client.get('/start')
+        assert b'RELOADED-CLUE-XYZ' in r.data
+    finally:
+        app_module.CLUES = orig_clues
+
+
 # --- Admin clue editor ---
 
 def test_admin_clues_requires_login(client):

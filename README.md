@@ -112,7 +112,7 @@ The admin password is set via an environment variable for security. Before runni
 ```bash
 export ADMIN_PASSWORD='your_super_secret_password'
 ```
-The dashboard is available at `/admin/dashboard`. If the environment variable is not set, it will default to `bruinvis` for development convenience.
+The dashboard is available at `/admin/dashboard`. The app refuses to start if `ADMIN_PASSWORD` is not set — there is no insecure default.
 
 ### Database
 

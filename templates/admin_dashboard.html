@@ -146,7 +146,7 @@
                             <input type="text" name="new_name" value="{{ player.player_name }}" class="name-input" size="15">
                             <button type="submit" class="action-button">Rename</button>
                         </form>
-                        <form method="post" action="{{ url_for('admin_remove_player', player_id=player.player_id) }}" style="display: inline-block;" onsubmit="return confirm('Are you sure you want to permanently remove {{ player.player_name }}?');">
+                        <form method="post" action="{{ url_for('admin_remove_player', player_id=player.player_id) }}" style="display: inline-block;" data-name="{{ player.player_name }}" onsubmit="return confirm('Are you sure you want to permanently remove ' + this.dataset.name + '?');">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="action-button remove">Remove</button>
                         </form>

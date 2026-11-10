@@ -47,7 +47,7 @@
             {% for stage in stages %}
             <tr>
                 <td>{{ stage.tag }}</td>
-                <td>{{ stage.clue }}{% if stage.clue %}…{% endif %}</td>
+                <td>{{ stage.clue }}</td>
                 <td>{{ stage.count }}</td>
                 <td class="bar-cell">
                     {% if stage.count and totals.total %}
