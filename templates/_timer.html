@@ -1,0 +1,15 @@
+{# Reusable elapsed-time counter. Expects `elapsed_seconds` (int). #}
+<div class="elapsed-timer" id="elapsedTimer" data-elapsed="{{ elapsed_seconds or 0 }}">&#9201;&#65039; --:--</div>
+<script>
+(function () {
+    const el = document.getElementById('elapsedTimer');
+    let s = parseInt(el.dataset.elapsed, 10) || 0;
+    const tick = () => {
+        const m = Math.floor(s / 60);
+        el.textContent = `\u23F1\uFE0F ${m}:${String(s % 60).padStart(2, '0')}`;
+        s++;
+    };
+    tick();
+    setInterval(tick, 1000);
+})();
+</script>

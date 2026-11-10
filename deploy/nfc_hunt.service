@@ -1,0 +1,15 @@
+[Unit]
+Description=uWSGI instance for NFC Treasure Hunt
+After=network.target
+
+[Service]
+RuntimeDirectory=uwsgi
+RuntimeDirectoryMode=0755
+User=ec2-user
+Group=nginx
+WorkingDirectory=/var/www/nfc_hunt
+Environment="PATH=/usr/bin"
+ExecStart=/usr/bin/uwsgi --ini /etc/uwsgi.d/nfc_hunt.ini
+
+[Install]
+WantedBy=multi-user.target

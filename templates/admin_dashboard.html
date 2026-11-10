@@ -64,6 +64,18 @@
     }
     .pagination a:hover { background-color: #f0f0f0; }
     .pagination .current { background-color: #546e7a; color: white; border-color: #546e7a; }
+
+    /* Sortable headers and status filter */
+    th a { color: white; text-decoration: none; }
+    th a:hover { text-decoration: underline; }
+    .status-filter a { color: #1976d2; }
+    .status-filter .active-filter { font-weight: bold; text-decoration: none; color: #333; }
+
+    /* Per-player time adjustment form */
+    .time-adjust { margin-top: 5px; font-size: 0.85em; }
+    .time-adjust summary { cursor: pointer; color: #1976d2; }
+    .time-adjust label { display: block; margin: 4px 0; }
+    .time-adjust input[type="datetime-local"] { padding: 2px; font-size: 0.9em; }
 </style>
 {% endblock %}
 
@@ -89,14 +101,23 @@
         </form>
     {% else %}
         <p>Welcome, Admin! Here is the current status of all explorers.</p>
+
+        <p class="status-filter">
+            Show:
+            <a href="{{ url_for('admin_dashboard', status='all', sort=current_sort) }}" {% if current_status == 'all' %}class="active-filter"{% endif %}>All</a> |
+            <a href="{{ url_for('admin_dashboard', status='active', sort=current_sort) }}" {% if current_status == 'active' %}class="active-filter"{% endif %}>Active</a> |
+            <a href="{{ url_for('admin_dashboard', status='finished', sort=current_sort) }}" {% if current_status == 'finished' %}class="active-filter"{% endif %}>Finished</a>
+        </p>
+
         <table class="admin-table">
             <thead>
                 <tr>
-                    <th>Player Name</th>
+                    <th><a href="{{ url_for('admin_dashboard', sort='name', status=current_status) }}">Player Name</a></th>
                     <th>Status / Current Clue</th>
-                    <th>Start Time</th>
+                    <th><a href="{{ url_for('admin_dashboard', sort='start', status=current_status) }}">Start Time</a></th>
                     <th>End Time</th>
-                    <th>Total Duration</th>
+                    <th><a href="{{ url_for('admin_dashboard', sort='last_scan', status=current_status) }}">Last Scan</a></th>
+                    <th><a href="{{ url_for('admin_dashboard', sort='duration', status=current_status) }}">Total Duration</a></th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -113,6 +134,7 @@
                     </td>
                     <td>{{ player.start_time or 'N/A' }}</td>
                     <td>{{ player.end_time or 'N/A' }}</td>
+                    <td>{{ player.last_scan_time or 'N/A' }}</td>
                     <td>{{ format_duration(player.duration) if player.duration else 'N/A' }}</td>
                     <td>
                         <form method="post" action="{{ url_for('admin_change_name', player_id=player.player_id) }}" style="display: inline-block; margin-right: 5px;">
@@ -124,6 +146,16 @@
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="action-button remove">Remove</button>
                         </form>
+                        <details class="time-adjust">
+                            <summary>Adjust time</summary>
+                            <form method="post" action="{{ url_for('admin_adjust_time', player_id=player.player_id) }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <label>Start: <input type="datetime-local" name="start_time" value="{{ player.start_time|replace(' ', 'T') if player.start_time }}" step="1"></label>
+                                <label>End: <input type="datetime-local" name="end_time" value="{{ player.end_time|replace(' ', 'T') if player.end_time }}" step="1"></label>
+                                <label><input type="checkbox" name="clear_end_time"> Clear end time (reopen game)</label>
+                                <button type="submit" class="action-button">Save</button>
+                            </form>
+                        </details>
                     </td>
                 </tr>
                 {% endfor %}
@@ -133,13 +165,13 @@
         {% if total_pages > 1 %}
         <div class="pagination">
             {% if current_page > 1 %}
-                <a href="{{ url_for('admin_dashboard', page=current_page - 1) }}">&laquo; Previous</a>
+                <a href="{{ url_for('admin_dashboard', page=current_page - 1, sort=current_sort, status=current_status) }}">&laquo; Previous</a>
             {% endif %}
 
             <span class="current">Page {{ current_page }} of {{ total_pages }}</span>
 
             {% if current_page < total_pages %}
-                <a href="{{ url_for('admin_dashboard', page=current_page + 1) }}">Next &raquo;</a>
+                <a href="{{ url_for('admin_dashboard', page=current_page + 1, sort=current_sort, status=current_status) }}">Next &raquo;</a>
             {% endif %}
         </div>
         {% endif %}

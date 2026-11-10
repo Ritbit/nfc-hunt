@@ -203,3 +203,67 @@ def test_admin_rename_requires_csrf(client):
     admin_login(client)
     r = client.post('/admin/change_name/whatever', data={'new_name': 'X'})
     assert r.status_code == 403
+
+
+def test_admin_status_filter(client):
+    register(client, 'Finisher')
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    with app_module.app.test_client() as c2:
+        c2.post('/', data={'player_name': 'StillPlaying'})
+        c2.get('/start')
+    admin_login(client)
+    r = client.get('/admin/dashboard?status=finished')
+    assert b'Finisher' in r.data and b'StillPlaying' not in r.data
+    r = client.get('/admin/dashboard?status=active')
+    assert b'StillPlaying' in r.data and b'Finisher' not in r.data
+
+
+def test_admin_sort_param_accepted(client):
+    admin_login(client)
+    for sort in ('start', 'last_scan', 'name', 'duration', 'bogus'):
+        assert client.get(f'/admin/dashboard?sort={sort}').status_code == 200
+
+
+def test_admin_adjust_time_requires_csrf(client):
+    register(client)
+    admin_login(client)
+    r = client.post('/admin/adjust_time/whatever', data={'start_time': '2025-01-01T10:00'})
+    assert r.status_code == 403
+
+
+def test_admin_adjust_time_updates_player(client):
+    register(client, 'TimeTraveler')
+    client.get('/start')
+    admin_login(client)
+    with client.session_transaction() as s:
+        token = s['csrf_token']
+        player_id = s['player_id'] if 'player_id' in s else None
+    # session is shared; fetch the player's id from the DB
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        pid = db.execute("SELECT player_id FROM players WHERE player_name = 'TimeTraveler'").fetchone()['player_id']
+    r = client.post(f'/admin/adjust_time/{pid}', data={
+        'csrf_token': token,
+        'start_time': '2020-01-01T10:00',
+        'end_time': '2020-01-01T11:30',
+    }, follow_redirects=True)
+    assert r.status_code == 200
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        row = db.execute("SELECT start_time, end_time FROM players WHERE player_id = ?", (pid,)).fetchone()
+        assert row['start_time'] == '2020-01-01 10:00:00'
+        assert row['end_time'] == '2020-01-01 11:30:00'
+
+
+def test_start_page_shows_elapsed_timer(client):
+    register(client)
+    r = client.get('/start')
+    assert b'elapsedTimer' in r.data
+
+
+def test_resume_page_shows_elapsed_timer(client):
+    register(client)
+    client.get('/start')
+    r = client.get('/resume')
+    assert b'elapsedTimer' in r.data

@@ -18,8 +18,8 @@
 - [x] **CSRF protection on admin POST routes** (`/admin/reset`, `/admin/remove_player`, `/admin/change_name`, login): session token checked on every POST.
 - [x] **Rate limit registration and admin login**: 10 registrations/min and 10 login attempts/5min per IP, in-process (note: uWSGI workers multiply effective limits).
 - [x] **Server-side uniqueness constraint** on `player_name COLLATE NOCASE` — unique index created in `init_db`/`reset_db.py`; `IntegrityError` handled at insert and rename.
-- [ ] **Admin dashboard**: show `last_scan_time` (detect stalled players), sort/filter by progress, link player rows.
-- [ ] **Countdown/timer display** on `start_game`/`resume_game`/`clue_display` so players see elapsed time.
+- [x] **Admin dashboard**: `last_scan_time` column added (spot stalled players), sortable columns (name/start/last scan/duration), status filter (all/active/finished).
+- [x] **Countdown/timer display**: live elapsed-time counter on `start_game`, `resume_game`, and `clue_display` via shared `templates/_timer.html`.
 
 ## Longer-term extensions
 
@@ -28,5 +28,5 @@
 - [ ] **Admin clue editor**: fill in `admin_clues.html` — edit `clues.yaml` from the dashboard with validation.
 - [ ] **i18n toggle**: clues are already bilingual (EN/NL) — let players pick a language instead of showing both.
 - [ ] **Stats panel**: average completion time, drop-off per clue, scan timestamps chart.
-- [ ] **Deployment artifacts**: ship the uWSGI ini / nginx conf / systemd unit from CONTEXT.md as files in `deploy/` so the server setup is versioned.
-- [ ] **Time adjustment in admin**: fix accidental starts or manually set start/end times.
+- [x] **Deployment artifacts**: uWSGI ini, nginx conf, and systemd unit now versioned in `deploy/` (from CONTEXT.md).
+- [x] **Time adjustment in admin**: `/admin/adjust_time/<player_id>` — set start/end times via datetime pickers or clear `end_time` to reopen a game. CSRF-protected.

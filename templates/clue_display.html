@@ -16,6 +16,7 @@
 
 
     {% if not final %}
+        {% include "_timer.html" %}
         <div class="clue-text">{{ clue }}</div>
         <div id="scan-instructions">
             <p class="success-message">Your current objective is to figure out this clue and <b>find the next fish tag</b> to continue your deep sea journey!</p>

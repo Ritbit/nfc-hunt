@@ -138,6 +138,14 @@ def _format_duration(total_seconds):
     minutes, seconds = divmod(int(total_seconds), 60)
     return f"{minutes} minutes and {seconds} seconds"
 
+def _elapsed_seconds(start_time_str):
+    """Seconds elapsed since a SQLite 'YYYY-MM-DD HH:MM:SS' (UTC) timestamp."""
+    if not start_time_str:
+        return 0
+    start_dt = parser.parse(start_time_str)
+    now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    return max(0, int((now_utc - start_dt).total_seconds()))
+
 # --- CSRF Protection ---
 def get_csrf_token():
     """Returns the session's CSRF token, generating one on first use."""
@@ -265,7 +273,10 @@ def start_game():
         db.commit()
         flash("Your timer has started! Good luck!", "info")
 
-    return render_template('start_game.html', player_name=player_name, first_clue=CLUES[INITIAL_TAG]['clue'])
+    return render_template('start_game.html',
+                           player_name=player_name,
+                           first_clue=CLUES[INITIAL_TAG]['clue'],
+                           elapsed_seconds=_elapsed_seconds(player['start_time']))
 
 @app.route('/resume')
 def resume_game():
@@ -276,7 +287,7 @@ def resume_game():
         return redirect(url_for('index'))
 
     db = get_db()
-    player = db.execute("SELECT player_name, current_clue_tag FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player = db.execute("SELECT player_name, current_clue_tag, start_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
 
     if not player:
         session.clear()
@@ -285,7 +296,10 @@ def resume_game():
     # The player's current clue is the one for the tag they are looking for.
     current_clue_tag = player['current_clue_tag'] or INITIAL_TAG
     current_clue_text = CLUES[current_clue_tag]['clue']
-    return render_template('resume_game.html', player_name=player['player_name'], current_clue=current_clue_text)
+    return render_template('resume_game.html',
+                           player_name=player['player_name'],
+                           current_clue=current_clue_text,
+                           elapsed_seconds=_elapsed_seconds(player['start_time']))
 
 def _get_player_from_session(db):
     """Authenticates a player from the session and fetches their DB record."""
@@ -391,7 +405,8 @@ def check_clue(tag_id):
                            final=(next_tag_id is None),
                            player_name=player_name,
                            completion_time=completion_time,
-                           player_rank=player_rank)
+                           player_rank=player_rank,
+                           elapsed_seconds=_elapsed_seconds(player_row['start_time']))
 
 @app.route('/leaderboard')
 def leaderboard():
@@ -436,10 +451,29 @@ def admin_dashboard():
     # --- Pagination Logic ---
     PER_PAGE = 15 # Number of players to show per page
 
+    # --- Sorting & Filtering (order clauses come from a fixed whitelist) ---
+    SORT_ORDERS = {
+        'start': 'start_time DESC',
+        'last_scan': 'last_scan_time DESC',
+        'name': 'player_name COLLATE NOCASE ASC',
+        'duration': 'duration DESC',
+    }
+    sort = request.args.get('sort', 'start')
+    order_by = SORT_ORDERS.get(sort, SORT_ORDERS['start'])
+
+    status = request.args.get('status')
+    where_clause = ''
+    if status == 'active':
+        where_clause = 'WHERE end_time IS NULL'
+    elif status == 'finished':
+        where_clause = 'WHERE end_time IS NOT NULL'
+    else:
+        status = 'all'
+
     db = get_db()
 
     # Get the total number of players for pagination controls
-    total_players_row = db.execute('SELECT COUNT(player_id) FROM players').fetchone()
+    total_players_row = db.execute(f'SELECT COUNT(player_id) FROM players {where_clause}').fetchone()
     total_players = total_players_row[0]
     total_pages = math.ceil(total_players / PER_PAGE)
 
@@ -450,24 +484,28 @@ def admin_dashboard():
 
     # Fetch only the players for the current page
     players_on_page = db.execute(f'''
-        SELECT 
+        SELECT
             player_id,
-            player_name, 
-            current_clue_tag, 
-            start_time, 
-            end_time, 
+            player_name,
+            current_clue_tag,
+            start_time,
+            end_time,
+            last_scan_time,
             (JULIANDAY(end_time) - JULIANDAY(start_time)) * 86400.0 AS duration
-        FROM players 
-        ORDER BY start_time DESC
+        FROM players
+        {where_clause}
+        ORDER BY {order_by}
         LIMIT {PER_PAGE} OFFSET {offset}
     ''').fetchall()
 
-    return render_template('admin_dashboard.html', 
-                           players=players_on_page, 
-                           format_duration=_format_duration, 
+    return render_template('admin_dashboard.html',
+                           players=players_on_page,
+                           format_duration=_format_duration,
                            admin_logged_in=True,
                            current_page=page,
-                           total_pages=total_pages)
+                           total_pages=total_pages,
+                           current_sort=sort,
+                           current_status=status)
 
 @app.route('/admin/reset', methods=['POST'])
 def admin_reset():
@@ -497,6 +535,60 @@ def admin_remove_player(player_id):
     db.commit()
     
     flash(f"Player has been successfully removed.", "info")
+    return redirect(url_for('admin_dashboard'))
+
+def _parse_admin_datetime(value):
+    """Normalizes a datetime-local form value to SQLite 'YYYY-MM-DD HH:MM:SS'.
+    Returns None for empty input; raises ValueError on unparseable input."""
+    value = (value or '').strip().replace('T', ' ')
+    if not value:
+        return None
+    for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M'):
+        try:
+            return datetime.datetime.strptime(value, fmt).strftime('%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            pass
+    raise ValueError(f"Invalid datetime: {value}")
+
+@app.route('/admin/adjust_time/<player_id>', methods=['POST'])
+def admin_adjust_time(player_id):
+    """Manually corrects a player's start/end time (e.g. accidental starts)."""
+    if not session.get('admin_logged_in'):
+        return "Unauthorized", 403
+    if not _csrf_valid():
+        return "Invalid CSRF token", 403
+
+    db = get_db()
+    player = db.execute("SELECT player_id FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    if not player:
+        flash("Player not found.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    try:
+        new_start = _parse_admin_datetime(request.form.get('start_time'))
+        new_end = _parse_admin_datetime(request.form.get('end_time'))
+    except ValueError as e:
+        flash(str(e), "error")
+        return redirect(url_for('admin_dashboard'))
+
+    updates, params = [], []
+    if new_start is not None:
+        updates.append("start_time = ?")
+        params.append(new_start)
+    if request.form.get('clear_end_time'):
+        updates.append("end_time = NULL")
+    elif new_end is not None:
+        updates.append("end_time = ?")
+        params.append(new_end)
+
+    if not updates:
+        flash("No time changes submitted.", "error")
+        return redirect(url_for('admin_dashboard'))
+
+    params.append(player_id)
+    db.execute(f"UPDATE players SET {', '.join(updates)} WHERE player_id = ?", params)
+    db.commit()
+    flash("Player times updated.", "info")
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/change_name/<player_id>', methods=['POST'])
