@@ -1,11 +1,13 @@
 # Project Context: NFC Treasure Hunt
 
 ## 1. Project Overview
+
 A lightweight, mobile-friendly NFC scavenger hunt application. Players use mobile phones to tap physical NFC tags programmed with NDEF URLs. The backend enforces strict clue progression in order, tracks player sessions, and calculates a final score based on completion time.
 
 ---
 
 ## 2. Tech Stack & Environment
+
 - **Operating System:** Amazon Linux / RHEL-based Linux
 - **Language & Runtime:** Python 3 (`python3`, `python3-devel`, `python3-pip`)
 - **Web Framework:** Flask
@@ -18,6 +20,7 @@ A lightweight, mobile-friendly NFC scavenger hunt application. Players use mobil
 ---
 
 ## 3. Directory Layout
+
 ```text
 /var/www/nfc_hunt/
 ├── app.py                     # Main application logic, DB schema, clue routing
@@ -44,7 +47,9 @@ A lightweight, mobile-friendly NFC scavenger hunt application. Players use mobil
 ## 4. Game Logic & Data Flow
 
 ### Sequence & Tag Registry
+
 The hunt uses a sequential linked list of clue locations defined in `clues.yaml` or `app.py`:
+
 1. `nfc-001` (Start: Coffee / Drink station) → Points to `nfc-002`
 2. `nfc-002` (Under casual chair) → Points to `nfc-003`
 3. `nfc-003` (Supply cabinet / pen box) → Points to `nfc-004`
@@ -52,10 +57,11 @@ The hunt uses a sequential linked list of clue locations defined in `clues.yaml`
 5. `nfc-005` (Server rack / firewall) → Final tag (`next_tag: None`, `final: True`)
 
 ### Progression Rules
+
 - **Entry Point:** A player starts by scanning `nfc-001` or entering the landing page to register team details.
 - **Session Identification:** Players receive a random UUID / session stored in Flask client-side encrypted cookies or local state.
 - **Sequential Enforcement:** If a player scans any tag other than `current_clue_tag`, the server rejects the scan and reminds them of their current objective.
-- **Completion Scoring:** 
+- **Completion Scoring:**
   - `start_time` is recorded on successful scan of the initial clue.
   - `end_time` is recorded on successful scan of the final clue.
   - Total elapsed duration is computed (`end_dt - start_dt`) and formatted as minutes and seconds, published to the leaderboard.
@@ -65,6 +71,7 @@ The hunt uses a sequential linked list of clue locations defined in `clues.yaml`
 ## 5. Server Configuration & Deployment
 
 ### uWSGI Configuration (`/etc/uwsgi.d/nfc_hunt.ini`)
+
 ```ini
 [uwsgi]
 chdir = /var/www/nfc_hunt
@@ -84,6 +91,7 @@ gid = nginx
 ```
 
 ### Nginx Reverse Proxy (`/etc/nginx/conf.d/nfc_hunt.conf`)
+
 ```nginx
 server {
     listen 80;
@@ -101,6 +109,7 @@ server {
 ```
 
 ### Systemd Service (`/etc/systemd/system/nfc_hunt.service`)
+
 ```ini
 [Unit]
 Description=uWSGI instance for NFC Treasure Hunt
@@ -122,6 +131,7 @@ WantedBy=multi-user.target
 ---
 
 ## 6. Known Gotchas & Operational Notes
+
 - **uWSGI INI Comments:** Do not place inline comments using `;` or `#` on the same line as directives (e.g. `gid = nginx ; comment`). The uWSGI parser treats trailing text as part of the directive value.
 - **Python Development Headers:** Compiling uWSGI on Amazon Linux requires `python3-devel` and `pcre-devel`.
 - **Socket Permissions:** Placing Unix sockets in `/tmp` frequently causes `502 Bad Gateway` errors due to standard directory access permissions or SELinux policies. Use `RuntimeDirectory=uwsgi` to manage `/var/run/uwsgi/` sockets cleanly.

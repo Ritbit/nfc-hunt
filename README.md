@@ -19,15 +19,15 @@ This application is designed to be a Progressive Web App (PWA), allowing users t
 
 ## ⚙️ How It Works
 
-1.  **Register**: A player visits the home page and enters their name to start.
-2.  **First Clue**: The game starts, the timer begins, and the first clue is displayed.
-3.  **Hunt**: The player must solve the clue, which leads them to a physical location with an NFC tag.
-4.  **Scan**: Using their phone, the player scans the NFC tag. The app's front-end uses the Web NFC API to read the tag's ID.
-5.  **Progress**: The app sends the scanned tag ID to the Flask backend.
-    -   If the tag is **correct**, the player is shown the next clue.
-    -   If the tag is **incorrect**, an error message is displayed, prompting them to try again.
-6.  **Finish**: Upon scanning the final tag, the timer stops. The player is shown their total time and their rank on the leaderboard.
-7.  **Compete**: Players can view the leaderboard at any time to see how they stack up against other explorers.
+1. **Register**: A player visits the home page and enters their name to start.
+2. **First Clue**: The game starts, the timer begins, and the first clue is displayed.
+3. **Hunt**: The player must solve the clue, which leads them to a physical location with an NFC tag.
+4. **Scan**: Using their phone, the player scans the NFC tag. The app's front-end uses the Web NFC API to read the tag's ID.
+5. **Progress**: The app sends the scanned tag ID to the Flask backend.
+    - If the tag is **correct**, the player is shown the next clue.
+    - If the tag is **incorrect**, an error message is displayed, prompting them to try again.
+6. **Finish**: Upon scanning the final tag, the timer stops. The player is shown their total time and their rank on the leaderboard.
+7. **Compete**: Players can view the leaderboard at any time to see how they stack up against other explorers.
 
 ## 🚀 Getting Started
 
@@ -42,49 +42,55 @@ Follow these instructions to get the application running on your own server.
 
 ### Installation
 
-1.  **Clone the repository:**
+1. **Clone the repository:**
+
     ```bash
     git clone <your-repository-url>
     cd adyen-nfc_hunt
     ```
 
-2.  **Create and activate a virtual environment (recommended):**
+2. **Create and activate a virtual environment (recommended):**
+
     ```bash
     python3 -m venv venv
     source venv/bin/activate
     ```
 
-3.  **Install the required Python packages:**
+3. **Install the required Python packages:**
+
     ```bash
     pip install -r requirements.txt
     ```
 
-4.  **Set the Flask Secret Key:**
+4. **Set the Flask Secret Key:**
     For security, the application's session key should be set as an environment variable.
+
     ```bash
     export FLASK_SECRET_KEY='a_very_strong_and_random_secret_key'
     ```
 
 ### Running the Application
 
-#### For Development:
+#### For Development
 
 You can use the built-in Flask development server. This is not suitable for production.
 
 ```bash
 flask run --host=0.0.0.0 --port=5000
 ```
+
 The app will be available at `http://<your-local-ip>:5000`.
 
-#### For Production (with Gunicorn & Nginx):
+#### For Production (with Gunicorn & Nginx)
 
-1.  **Run with Gunicorn:**
+1. **Run with Gunicorn:**
     Gunicorn is a robust WSGI HTTP server for UNIX.
+
     ```bash
     gunicorn --workers 3 --bind unix:adyen-nfc_hunt.sock -m 007 app:app
     ```
 
-2.  **Configure Nginx as a reverse proxy:**
+2. **Configure Nginx as a reverse proxy:**
     Set up an Nginx server block to proxy requests to the Gunicorn socket. This is also where you would configure SSL/TLS for HTTPS, which is **required** for the Web NFC API to work.
 
 ## 🔧 Configuration
@@ -100,6 +106,7 @@ The admin password is set via an environment variable for security. Before runni
 ```bash
 export ADMIN_PASSWORD='your_super_secret_password'
 ```
+
 The dashboard is available at `/admin/dashboard`. The app refuses to start if `ADMIN_PASSWORD` is not set — there is no insecure default.
 
 ### Database
