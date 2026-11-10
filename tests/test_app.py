@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -23,6 +24,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(reset_db_module, 'DATABASE', db_path)
     app_module.init_db()
     app_module._attempts.clear()       # reset rate limiter between tests
+    # Deterministic canonical order by default; shuffle tests opt in explicitly
+    monkeypatch.setattr(app_module, 'SHUFFLE_HUNT', False)
     app_module.app.config['TESTING'] = True
     with app_module.app.test_client() as c:
         yield c
@@ -456,6 +459,70 @@ def test_admin_export_csv(client):
 
 def test_admin_export_requires_login(client):
     assert client.get('/admin/export.csv').status_code == 403
+
+
+# --- Per-player shuffled chains ---
+
+def _chain_for(player_name):
+    with app_module.app.test_request_context():
+        db = app_module.get_db()
+        row = db.execute("SELECT clue_chain FROM players WHERE player_name = ?", (player_name,)).fetchone()
+        return json.loads(row['clue_chain'])
+
+
+def test_shuffle_assigns_personal_chain(client, monkeypatch):
+    monkeypatch.setattr(app_module, 'SHUFFLE_HUNT', True)
+    register(client, 'Shuffler')
+    client.get('/start')
+    chain = _chain_for('Shuffler')
+    assert sorted(chain) == sorted(TAGS)
+    assert chain[-1] == FINAL_TAG          # final tag stays last
+    assert len(chain) == len(TAGS)
+
+
+def test_game_completes_in_shuffled_order(client, monkeypatch):
+    monkeypatch.setattr(app_module, 'SHUFFLE_HUNT', True)
+    register(client, 'MyOrder')
+    client.get('/start')
+    chain = _chain_for('MyOrder')
+    for tag in chain:
+        r = client.get(f'/hunt/clue/{tag}')
+        assert b'Incorrect tag' not in r.data
+    assert b'minutes and' in r.data
+
+
+def test_shuffle_off_uses_default_order(client, monkeypatch):
+    monkeypatch.setattr(app_module, 'SHUFFLE_HUNT', False)
+    register(client, 'Linear')
+    client.get('/start')
+    assert _chain_for('Linear') == TAGS
+
+
+def test_scan_any_nonfinal_tag_starts_game(client, monkeypatch):
+    monkeypatch.setattr(app_module, 'SHUFFLE_HUNT', True)
+    register(client, 'Maverick')
+    mid_tag = TAGS[2]
+    r = client.get(f'/hunt/clue/{mid_tag}')
+    assert b'Incorrect tag' not in r.data
+    assert _chain_for('Maverick')[0] == mid_tag
+
+
+def test_scan_final_tag_first_rejected(client):
+    register(client)
+    r = client.get(f'/hunt/clue/{FINAL_TAG}')
+    assert b'Incorrect tag' in r.data
+
+
+# --- Websocket leaderboard updates ---
+
+def test_finish_emits_leaderboard_update(client):
+    sio = app_module.socketio.test_client(app_module.app)
+    assert sio.is_connected()
+    register(client)
+    for tag in TAGS:
+        client.get(f'/hunt/clue/{tag}')
+    received = sio.get_received()
+    assert any(e['name'] == 'leaderboard_update' for e in received)
 
 
 # --- Admin QR tags ---

@@ -64,10 +64,11 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='socket.io.min.js') }}"></script>
 <script>
-    // Refresh the leaderboard table in place every 30 seconds without
-    // reloading the page, so scroll position and focus are preserved.
-    setInterval(async () => {
+    // Refresh the leaderboard tables in place without reloading the page,
+    // so scroll position and focus are preserved.
+    async function refreshLeaderboard() {
         try {
             const html = await (await fetch(window.location.href)).text();
             const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -80,6 +81,15 @@
             }
             current.forEach((t, i) => { t.innerHTML = fresh[i].innerHTML; });
         } catch (e) { /* keep the stale table on transient errors */ }
-    }, 30000);
+    }
+
+    // Instant updates via websocket; the 30s poll remains as a fallback.
+    if (window.io) {
+        try {
+            const socket = io();
+            socket.on('leaderboard_update', refreshLeaderboard);
+        } catch (e) { /* fall back to polling only */ }
+    }
+    setInterval(refreshLeaderboard, 30000);
 </script>
 {% endblock %}

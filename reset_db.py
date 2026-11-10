@@ -33,7 +33,8 @@ def reset_database():
             end_time DATETIME,
             wrong_scans INTEGER NOT NULL DEFAULT 0,
             hints_used INTEGER NOT NULL DEFAULT 0,
-            team_name TEXT NOT NULL DEFAULT ''
+            team_name TEXT NOT NULL DEFAULT '',
+            clue_chain TEXT
         )
     ''')
     conn.execute('''

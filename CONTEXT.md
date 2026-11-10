@@ -136,3 +136,9 @@ WantedBy=multi-user.target
 - **Python Development Headers:** Compiling uWSGI on Amazon Linux requires `python3-devel` and `pcre-devel`.
 - **Socket Permissions:** Placing Unix sockets in `/tmp` frequently causes `502 Bad Gateway` errors due to standard directory access permissions or SELinux policies. Use `RuntimeDirectory=uwsgi` to manage `/var/run/uwsgi/` sockets cleanly.
 - **HTTPS Requirement:** iOS and modern Android NFC handlers require HTTPS (`https://`) to launch URLs silently without safety warnings.
+- **Websockets under uWSGI:** The leaderboard uses Flask-SocketIO. Plain uWSGI
+  workers cannot upgrade websocket connections, so clients fall back to
+  long-polling automatically. Native websockets require an async worker
+  (gevent/eventlet) or running behind a ws-capable proxy — optional, not required.
+- **SHUFFLE_HUNT:** Set `SHUFFLE_HUNT=0` to give every player the same canonical
+  clue order. Default shuffles each player's middle tags at timer start.

@@ -12,6 +12,10 @@ for AI agents and developers modifying this codebase.
   (Safari / Chrome) when scanning NFC tags.
 - **Reliable sequential progression:** State enforcement occurs strictly on the
   server, never client-side.
+- **Per-player clue order:** Each player's chain is stored as JSON in
+  `players.clue_chain` (assigned when their timer starts). With `SHUFFLE_HUNT`
+  enabled (default) the middle tags are shuffled; the final tag is always last.
+  `players.current_clue_tag` is the source of truth for progress.
 
 ---
 

@@ -4,4 +4,6 @@ python-dateutil
 better-profanity
 profanity-wordlists
 qrcode
+Flask-SocketIO
+simple-websocket
 gunicorn  # For production

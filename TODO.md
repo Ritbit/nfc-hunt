@@ -37,12 +37,12 @@ Medium:
 - [x] **Hint system**: optional `hint: {en, nl}` per clue (editable in `/admin/clues`); `/hint` route shows it and counts `hints_used`; shown on finish screen.
 - [x] **Live admin feed**: `scans` event table logs every scan (correct/wrong); "Recent Scans" table on dashboard auto-refreshes every 15s in place.
 - [ ] **Countdown race mode**: fixed time limit, score = clues found.
-- [ ] **Randomized clue order per player**: shuffled chain stored per player, kills tag-queuing.
+- [x] **Randomized clue order per player**: `clue_chain` JSON column; middle tags shuffled per player (final always last), any non-final tag can start the game. Toggle via `SHUFFLE_HUNT=0`.
 
 Bigger:
 
 - [ ] **Photo finish**: selfie upload at final tag, hall-of-fame gallery.
-- [ ] **Websocket leaderboard**: Flask-SocketIO is already installed; push updates instead of polling.
+- [x] **Websocket leaderboard**: `leaderboard_update` pushed via Flask-SocketIO on finish/admin changes; 30s in-place poll kept as fallback.
 - [x] **CSV export**: `/admin/export.csv` streams all player data (name, team, times, wrong scans, hints).
 
 ## Longer-term extensions

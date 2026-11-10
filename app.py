@@ -1,4 +1,5 @@
 from flask import Flask, request, redirect, url_for, render_template, session, flash, g, Response
+from flask_socketio import SocketIO
 import uuid
 import sqlite3
 import datetime
@@ -10,6 +11,8 @@ from reset_db import reset_database # Import the reset function
 import math
 import csv
 import io
+import json
+import random
 import secrets
 import shutil
 import time
@@ -19,6 +22,9 @@ import qrcode.image.svg
 from collections import defaultdict
 # --- Flask Configuration ---
 app = Flask(__name__)
+# Push updates (e.g. leaderboard changes) to connected clients. Falls back to
+# long-polling where native websockets aren't available (e.g. plain uWSGI).
+socketio = SocketIO(app)
 
 import os
 # --- Security Best Practice: Load Secret Key from Environment Variable ---
@@ -79,6 +85,9 @@ def init_db():
             db.execute('ALTER TABLE players ADD COLUMN hints_used INTEGER NOT NULL DEFAULT 0')
         if 'team_name' not in columns:
             db.execute("ALTER TABLE players ADD COLUMN team_name TEXT NOT NULL DEFAULT ''")
+        if 'clue_chain' not in columns:
+            # NULL = default chain order; otherwise a JSON array of tag ids
+            db.execute('ALTER TABLE players ADD COLUMN clue_chain TEXT')
 
         # Scan event log — powers the live admin feed
         db.execute('''
@@ -183,6 +192,44 @@ profanity.load_censor_words(DUTCH_PROFANITY_LIST)
 
 # --- Helper Functions & Dynamic Configuration ---
 SUPPORTED_LANGUAGES = ('en', 'nl')
+
+# Per-player shuffled clue order (SHUFFLE_HUNT=0 disables).
+# The final tag always stays last; only the middle tags are shuffled.
+SHUFFLE_HUNT = os.environ.get('SHUFFLE_HUNT', '1').lower() not in ('0', 'false', 'no', 'off')
+
+def _default_chain():
+    """The canonical clue order, walked from the chain's start tag."""
+    chain, tag = [], INITIAL_TAG
+    while tag is not None:
+        chain.append(tag)
+        tag = CLUES[tag].get('next_tag')
+    return chain
+
+def _assign_chain(db, player_id, first_tag=None):
+    """Stores this player's personal clue order and returns it. Called when the
+    player's timer starts. The final tag always stays last; the middle tags are
+    shuffled when SHUFFLE_HUNT is on. `first_tag` forces a specific first step
+    (e.g. a tap-to-start scan of a mid-chain tag)."""
+    chain = _default_chain()
+    middle, last = chain[:-1], chain[-1]
+    if SHUFFLE_HUNT:
+        random.shuffle(middle)
+    if first_tag in middle:
+        middle.remove(first_tag)
+        middle.insert(0, first_tag)
+    chain = middle + [last]
+    db.execute("UPDATE players SET clue_chain = ? WHERE player_id = ?", (json.dumps(chain), player_id))
+    return chain
+
+def _player_chain(player_row):
+    """Returns the player's stored chain, or the default order when unset."""
+    stored = player_row['clue_chain']
+    if stored:
+        try:
+            return json.loads(stored)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return _default_chain()
 
 def clue_field(tag_id, field):
     """Returns a localized clue field ('clue' or 'hint') for a tag.
@@ -373,9 +420,10 @@ def start_game():
     # If the player exists and their timer hasn't started yet, start it now.
     # This is idempotent, so reloading the page won't reset the timer.
     if player and player['start_time'] is None:
+        chain = _assign_chain(db, player_id)
         db.execute(
             "UPDATE players SET start_time = DATETIME('now'), current_clue_tag = ? WHERE player_id = ?",
-            (INITIAL_TAG, player_id)
+            (chain[0], player_id)
         )
         db.commit()
         flash("Your timer has started! Good luck!", "info")
@@ -417,7 +465,7 @@ def _get_player_from_session(db):
     player_id = session.get('player_id')
     if not player_id:
         return None, None
-    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time, wrong_scans, hints_used FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player_row = db.execute("SELECT player_name, current_clue_tag, start_time, end_time, wrong_scans, hints_used, clue_chain FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player_row:
         session.clear()
         return None, None
@@ -473,19 +521,21 @@ def check_clue(tag_id):
         return redirect(url_for('leaderboard'))
 
     current_expected_tag = player_row['current_clue_tag']
+    chain = _player_chain(player_row)
 
     # A player who registered but never visited /start has no current tag.
-    # Scanning the first tag doubles as their start: begin the timer and
-    # treat the scan as a correct first find.
+    # Scanning any valid non-final tag doubles as their start: the timer
+    # begins and their personal chain starts at the tag they just found.
     if current_expected_tag is None:
-        if tag_id != INITIAL_TAG:
+        if tag_id not in CLUES or tag_id == chain[-1]:
             return _handle_incorrect_scan(db, player_id, player_name, INITIAL_TAG, tag_id)
+        chain = _assign_chain(db, player_id, first_tag=tag_id)
         db.execute(
             "UPDATE players SET start_time = DATETIME('now'), current_clue_tag = ? WHERE player_id = ?",
-            (INITIAL_TAG, player_id)
+            (chain[0], player_id)
         )
         db.commit()
-        current_expected_tag = INITIAL_TAG
+        current_expected_tag = chain[0]
 
     # Validate the scanned tag
     if tag_id != current_expected_tag:
@@ -496,7 +546,12 @@ def check_clue(tag_id):
     if not clue_data:
         return render_template('error.html', message="This tag is not active in the current hunt.", player_name=player_name)
 
-    next_tag_id = clue_data['next_tag']
+    # The next tag follows this player's personal (possibly shuffled) chain
+    try:
+        idx = chain.index(tag_id)
+    except ValueError:
+        idx = -1
+    next_tag_id = chain[idx + 1] if 0 <= idx < len(chain) - 1 else None
     completion_time, player_rank = None, None
 
     # Determine which clue to display on the success page.
@@ -523,6 +578,9 @@ def check_clue(tag_id):
         ).fetchone()[0]
 
     db.commit()
+    if next_tag_id is None:
+        # Emit only after the finish is committed, so clients fetch fresh data
+        socketio.emit('leaderboard_update')
 
     return render_template('clue_display.html',
                            clue=display_clue,
@@ -678,6 +736,7 @@ def admin_reset():
     session.clear()
     session['admin_logged_in'] = True # Keep the admin logged in
     flash("Database has been successfully reset. All player data is gone.", "info")
+    socketio.emit('leaderboard_update')
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/remove_player/<player_id>', methods=['POST'])
@@ -693,6 +752,7 @@ def admin_remove_player(player_id):
     db.commit()
     
     flash(f"Player has been successfully removed.", "info")
+    socketio.emit('leaderboard_update')
     return redirect(url_for('admin_dashboard'))
 
 def _parse_admin_datetime(value):
@@ -717,7 +777,7 @@ def admin_adjust_time(player_id):
         return "Invalid CSRF token", 403
 
     db = get_db()
-    player = db.execute("SELECT player_id, start_time, end_time FROM players WHERE player_id = ?", (player_id,)).fetchone()
+    player = db.execute("SELECT player_id, start_time, end_time, clue_chain FROM players WHERE player_id = ?", (player_id,)).fetchone()
     if not player:
         flash("Player not found.", "error")
         return redirect(url_for('admin_dashboard'))
@@ -749,8 +809,8 @@ def admin_adjust_time(player_id):
     if request.form.get('clear_end_time'):
         updates.append("end_time = NULL")
         # Reopened players are still 'FINISHED' in current_clue_tag; point them
-        # back at the final tag so rescanning it completes the game again.
-        final_tag = next(t for t, c in CLUES.items() if c.get('next_tag') is None)
+        # back at the last tag of their personal chain so rescanning finishes.
+        final_tag = _player_chain(player)[-1]
         updates.append("current_clue_tag = ?")
         params.append(final_tag)
     elif new_end is not None:
@@ -975,6 +1035,7 @@ def admin_change_name(player_id):
         flash(f"The name '{new_name}' is already in use by another player.", "error")
         return redirect(url_for('admin_dashboard'))
     flash("Player name has been updated successfully.", "info")
+    socketio.emit('leaderboard_update')
     return redirect(url_for('admin_dashboard'))
 
 @app.errorhandler(404)
@@ -986,4 +1047,7 @@ def page_not_found(e):
 if __name__ == '__main__':
     # For testing, run with: python3 app.py
     # For production, use Gunicorn/Nginx as described previously
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    # FLASK_DEBUG=1 enables the debugger; keep it off by default so the
+    # interactive debugger is never exposed on the network.
+    debug = os.environ.get('FLASK_DEBUG', '0').lower() in ('1', 'true', 'yes', 'on')
+    socketio.run(app, host='0.0.0.0', port=5000, debug=debug)
