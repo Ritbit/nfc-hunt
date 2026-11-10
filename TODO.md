@@ -24,6 +24,7 @@
 ## Feature ideas (brainstorm)
 
 Cheap wins:
+
 - [x] **Wrong-tag counter**: `wrong_scans` column (migrated), incremented on each bad scan, shown on finish screen + admin dashboard.
 - [x] **Celebration feedback**: confetti + `navigator.vibrate` on `clue_display` (bigger burst on the final tag); shake + vibrate on the error page.
 - [x] **QR fallback**: `/admin/tags` renders printable SVG QR codes per tag (print-friendly CSS), linked from the dashboard.
@@ -31,6 +32,7 @@ Cheap wins:
 - [x] **Players still hunting**: finish screen shows "N explorers still out there hunting!".
 
 Medium:
+
 - [ ] **Teams**: `team_name` on players, team leaderboard (best/avg time).
 - [ ] **Hint system**: optional `hint:` field per clue, "stuck?" button reveals it (+time penalty).
 - [ ] **Live admin feed**: auto-refreshing recent scan events.
@@ -38,6 +40,7 @@ Medium:
 - [ ] **Randomized clue order per player**: shuffled chain stored per player, kills tag-queuing.
 
 Bigger:
+
 - [ ] **Photo finish**: selfie upload at final tag, hall-of-fame gallery.
 - [ ] **Websocket leaderboard**: Flask-SocketIO is already installed; push updates instead of polling.
 - [ ] **CSV export**: players/times download from admin.
