@@ -1038,11 +1038,27 @@ def admin_change_name(player_id):
     socketio.emit('leaderboard_update')
     return redirect(url_for('admin_dashboard'))
 
+def _render_http_error(code, emoji, title, message):
+    return render_template('http_error.html', code=code, emoji=emoji,
+                           title=title, message=message), code
+
+@app.errorhandler(403)
+def forbidden(e):
+    """Themed page for CSRF rejections and unauthorized access."""
+    return _render_http_error(403, "🚫", "Off-limits waters!",
+                              "You don't have permission to swim in this part of the ocean.")
+
 @app.errorhandler(404)
 def page_not_found(e):
-    """Custom 404 handler to redirect to the index page."""
-    flash("The page you were looking for could not be found. Let's start over!", "error")
-    return redirect(url_for('index'))
+    """Themed 404 page instead of a bare server error."""
+    return _render_http_error(404, "🧭", "Lost at sea!",
+                              "The page you were looking for drifted away with the current.")
+
+@app.errorhandler(500)
+def internal_error(e):
+    """Themed page for unexpected server errors."""
+    return _render_http_error(500, "🦑", "A kraken attacked the ship!",
+                              "Something went wrong on our end. The crew has been notified.")
 
 if __name__ == '__main__':
     # For testing, run with: python3 app.py

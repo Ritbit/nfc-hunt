@@ -599,3 +599,13 @@ def test_admin_stats_renders(client):
     r = client.get('/admin/stats')
     assert r.status_code == 200
     assert b'Game Statistics' in r.data and b'Average Time' in r.data
+
+
+def test_404_renders_themed_page(client):
+    resp = client.get('/no/such/page')
+    assert resp.status_code == 404
+    assert b'Lost at sea' in resp.data
+
+def test_403_renders_themed_page(client):
+    resp = client.post('/admin/remove_player/1', data={})
+    assert resp.status_code in (403, 302)

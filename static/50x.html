@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Temporarily Underwater - Ocean Adventure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#1c4587">
+    <link rel="icon" href="/static/fish.png" type="image/png">
+    <!-- Standalone page: served by nginx when the app server is unreachable,
+         so everything (including styles) must be inline. -->
+    <style>
+        body {
+            margin: 0; min-height: 100vh; display: flex;
+            align-items: center; justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to top, #0093E9 0%, #a1a3f5 100%);
+            color: #1c1c1c;
+        }
+        .card {
+            background: white; border-radius: 12px; padding: 30px 40px;
+            max-width: 420px; margin: 20px; text-align: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+        }
+        .code { font-size: 3em; margin: 0; color: #005662; }
+        h1 { color: #00838f; font-size: 1.4em; }
+        p { line-height: 1.5; }
+        a { color: #0097a7; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <p class="code">🌊</p>
+        <h1>The treasure ship is temporarily submerged!</h1>
+        <p>Our game server is taking a quick dive. It usually resurfaces within a
+           minute or two — please try again shortly.</p>
+        <p><a href="/">Try again</a></p>
+    </div>
+</body>
+</html>

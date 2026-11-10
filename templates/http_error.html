@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}{{ code }} - Ocean Adventure{% endblock %}
+
+{% block head_styles %}
+<style>
+    .container { animation: error-shake 0.4s ease-in-out; }
+    .error-code { font-size: 3em; margin: 0; color: #005662; }
+    .error-message {
+        font-size: 1.2em; color: #8b0000; padding: 15px;
+        background-color: #fce1e1; border: 2px solid #cc0000;
+        border-radius: 8px; margin-bottom: 20px;
+    }
+    @keyframes error-shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-8px); }
+        75% { transform: translateX(8px); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <p class="error-code">{{ emoji }} {{ code }}</p>
+        <h1>{{ title }}</h1>
+        <hr>
+        <div class="error-message">{{ message }}</div>
+        <p><a href="{{ url_for('index') }}">Back to the surface</a></p>
+    </div>
+{% endblock %}
